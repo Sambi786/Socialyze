@@ -1,0 +1,6 @@
+{
+  "name": "Zocialyse",
+  "description": "An all-in-one English social media app blending Reels, Streaks, YouTube-like videos, Facebook-like birthdays, and an advanced Gemini AI analysis chatbot.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
