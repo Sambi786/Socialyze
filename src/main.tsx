@@ -5,7 +5,7 @@ import { AppProvider } from './AppContext';
 import './index.css';
 
 // Initialize theme before rendering to avoid flash
-const savedTheme = localStorage.getItem('zocialyse-theme');
+const savedTheme = localStorage.getItem('socialyze-theme');
 if (savedTheme === 'light') {
   document.documentElement.classList.add('theme-light');
 }

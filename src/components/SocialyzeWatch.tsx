@@ -5,8 +5,9 @@ import { ShareModal } from "./ShareModal";
 import { useAppContext } from "../AppContext";
 import { ReactionButton } from "./ReactionButton";
 import { toast } from "../lib/toast";
+import { Logo } from "./Logo";
 
-export function ZocialyseWatch() {
+export function SocialyzeWatch() {
   const { videos, user, likePost, addFriend, friends } = useAppContext();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [itemToShare, setItemToShare] = useState<{url: string, title: string} | null>(null);
@@ -299,7 +300,10 @@ export function ZocialyseWatch() {
   return (
     <div className="h-full bg-slate-950 flex flex-col overflow-hidden">
       <div className="p-4 border-b border-slate-800 sticky top-0 bg-slate-900/50 backdrop-blur-md z-20 flex justify-between items-center">
-        <h1 className="text-xl font-black tracking-tighter text-white">WATCH & LIVE</h1>
+        <div className="flex items-center gap-2">
+          <Logo size="sm" />
+          <h1 className="text-xl font-black tracking-tighter text-white hidden md:block">WATCH & LIVE</h1>
+        </div>
         <button 
           onClick={() => setIsLive(true)}
           className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-4 py-1.5 rounded-full flex items-center gap-2 text-xs font-bold uppercase tracking-widest hover:opacity-90 transition-opacity shadow-lg shadow-pink-500/20"

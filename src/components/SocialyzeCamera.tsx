@@ -18,7 +18,7 @@ const PRESET_FILTERS = [
   { name: "Matrix", params: { sepia: 0, hue: 120, contrast: 140, brightness: 100 } },
 ];
 
-export function ZocialyseCamera({ onClose, onSendToFriend }: { onClose: () => void, onSendToFriend: (friendId: string, customText: string) => void }) {
+export function SocialyzeCamera({ onClose, onSendToFriend }: { onClose: () => void, onSendToFriend: (friendId: string, customText: string) => void }) {
   const { createPost, user, friends } = useAppContext();
   const [filterParams, setFilterParams] = useState<FilterParams>(PRESET_FILTERS[0].params);
   const [selectedPreset, setSelectedPreset] = useState("Normal");

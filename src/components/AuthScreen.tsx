@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Camera, Gamepad2, Layers, Zap, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "../lib/toast";
 import { useAppContext } from "../AppContext";
+import { Logo } from "./Logo";
 
 export function AuthScreen() {
   const { login, resetOldAccount, completeTutorial } = useAppContext();
@@ -17,7 +18,7 @@ export function AuthScreen() {
 
   const handleAuth = () => {
     if (isResetRequired) {
-      if (!email.trim() || !password || !confirmPassword) {
+      if (!username.trim() || !email.trim() || !password || !confirmPassword) {
         toast({ title: "Error", message: "Please fill out all fields", icon: "bell" });
         return;
       }
@@ -27,11 +28,9 @@ export function AuthScreen() {
       }
       const success = resetOldAccount(username, email, password);
       if (success) {
-        toast({ title: "Success!", message: "Your old account has been secured! Welcome back.", icon: "gift" });
+        toast({ title: "Success!", message: "Your password has been successfully reset! Welcome back.", icon: "gift" });
       } else {
-        toast({ title: "Error", message: "Incorrect email. Please register as a new user.", icon: "bell" });
-        setIsResetRequired(false);
-        setIsRegister(true);
+        toast({ title: "Error", message: "Incorrect username or email.", icon: "bell" });
       }
       return;
     }
@@ -63,10 +62,11 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-[100dvh] w-full bg-[#0a0a0e] flex flex-col items-center justify-center p-6 sm:p-12 text-slate-50 overflow-auto relative">
-      {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div 
+    <div className="h-full w-full bg-[#0a0a0e] overflow-y-auto relative text-slate-50">
+      <div className="min-h-full w-full flex flex-col items-center justify-center p-6 sm:p-12">
+        {/* Animated Background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div 
           animate={{ 
             scale: [1, 1.2, 1],
             rotate: [0, 90, 0],
@@ -107,11 +107,7 @@ export function AuthScreen() {
           className="flex justify-center mb-8 relative"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 to-indigo-500 blur-2xl opacity-40 scale-150 rounded-full" />
-          <div className="relative w-24 h-24 bg-slate-900 border border-slate-700/50 rounded-3xl shadow-2xl flex items-center justify-center">
-            <h1 className="text-6xl font-black bg-gradient-to-r from-cyan-400 to-indigo-500 bg-clip-text text-transparent transform">
-              Z
-            </h1>
-          </div>
+          <Logo size="lg" />
         </motion.div>
         
         <motion.div 
@@ -120,7 +116,7 @@ export function AuthScreen() {
           transition={{ delay: 0.3, duration: 0.8 }}
           className="text-center mb-10"
         >
-          <h1 className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 mb-4 pb-1">ZOCIALYSE</h1>
+          <h1 className="text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 mb-4 pb-1">SOCIALYZE</h1>
           <p className="text-slate-300/80 text-lg font-medium">The ultimate social universe.</p>
         </motion.div>
 
@@ -205,13 +201,23 @@ export function AuthScreen() {
               type="submit"
               className="w-full bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 hover:opacity-90 transition-all text-white font-bold py-4 rounded-2xl shadow-xl shadow-purple-500/25 mt-6 tracking-widest uppercase text-sm flex items-center justify-center gap-2 group hover:scale-[1.02]"
             >
-              {isRegister ? "Join Zocialyse" : "Log In"}
+              {isRegister ? "Join Socialyze" : "Log In"}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
           </form>
           
-          <div className="mt-8 text-center relative z-10">
+          <div className="mt-8 text-center relative z-10 flex flex-col gap-3">
+            {!isRegister && (
+              <button 
+                type="button"
+                onClick={() => { setIsRegister(false); setIsResetRequired(true); }}
+                className="text-pink-400 hover:text-pink-300 transition-colors text-sm font-medium"
+              >
+                Forgot your password?
+              </button>
+            )}
             <button 
+              type="button"
               onClick={() => setIsRegister(!isRegister)}
               className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
             >
@@ -225,9 +231,16 @@ export function AuthScreen() {
       {isResetRequired && (
         <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 w-full max-w-md rounded-3xl border border-slate-800 shadow-2xl p-8 relative animation-slide-up text-center">
-            <h2 className="text-2xl font-bold mb-2 text-white">Secure Your Account</h2>
-            <p className="text-sm text-slate-400 mb-6 font-medium">This is an old account. Please confirm your email address and set a new password to secure it.</p>
+            <h2 className="text-2xl font-bold mb-2 text-white">Reset Your Password</h2>
+            <p className="text-sm text-slate-400 mb-6 font-medium">Please confirm your email address and set a new password for your account.</p>
             <div className="space-y-4 mb-8">
+              <input 
+                type="text" 
+                placeholder="Username" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 focus:outline-none focus:border-cyan-500/50 transition-all font-medium placeholder-slate-500 text-white"
+              />
               <input 
                 type="email" 
                 placeholder="Your Email Address" 
@@ -267,6 +280,7 @@ export function AuthScreen() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { AuthScreen } from "./components/AuthScreen";
-import { ZocialyseFeed } from "./components/ZocialyseFeed";
-import { ZocialyseSocial } from "./components/ZocialyseSocial";
-import { ZocialyseWatch } from "./components/ZocialyseWatch";
-import { ZocialyseAI } from "./components/ZocialyseAI";
-import { ZocialyseProfile } from "./components/ZocialyseProfile";
+import { SocialyzeFeed } from "./components/SocialyzeFeed";
+import { SocialyzeSocial } from "./components/SocialyzeSocial";
+import { SocialyzeWatch } from "./components/SocialyzeWatch";
+import { SocialyzeAI } from "./components/SocialyzeAI";
+import { SocialyzeProfile } from "./components/SocialyzeProfile";
 import { ToastContainer } from "./components/ToastContainer";
 import { CreatePostModal } from "./components/CreatePostModal";
 import { toast } from "./lib/toast";
 import { playNotificationSound } from "./lib/audio";
 import { Layers, MessageSquare, PlaySquare, Bot, UserCircle, Plus, Gamepad2 } from "lucide-react";
 import { useAppContext } from "./AppContext";
-import { ZocialyseGames } from "./components/ZocialyseGames";
+import { SocialyzeGames } from "./components/SocialyzeGames";
+import { Logo } from "./components/Logo";
 
 type Tab = "feed" | "social" | "watch" | "ai" | "profile" | "games";
 
@@ -95,12 +96,12 @@ export default function App() {
 
   const renderContent = () => {
     switch (currentTab) {
-      case "feed": return <ZocialyseFeed />;
-      case "social": return <ZocialyseSocial onOpenCreatePost={(friendName) => setIsTagModalOpen({isOpen: true, taggedFriend: friendName})} />;
-      case "watch": return <ZocialyseWatch />;
-      case "ai": return <ZocialyseAI />;
-      case "games": return <ZocialyseGames />;
-      case "profile": return <ZocialyseProfile onLogout={logout} onNavigateToPost={(type) => {
+      case "feed": return <SocialyzeFeed />;
+      case "social": return <SocialyzeSocial onOpenCreatePost={(friendName) => setIsTagModalOpen({isOpen: true, taggedFriend: friendName})} />;
+      case "watch": return <SocialyzeWatch />;
+      case "ai": return <SocialyzeAI />;
+      case "games": return <SocialyzeGames onExit={() => setCurrentTab('feed')} />;
+      case "profile": return <SocialyzeProfile onLogout={logout} onNavigateToPost={(type) => {
         if (type === 'video' || type === 'live') setCurrentTab('watch');
         else setCurrentTab('feed');
       }} />;
@@ -111,28 +112,28 @@ export default function App() {
     <div className="flex bg-slate-950 h-[100dvh] w-full overflow-hidden font-sans">
       <ToastContainer />
       {/* Desktop Sidebar Navigation */}
-      <aside className="hidden md:flex w-24 bg-slate-900/50 backdrop-blur-md border-r border-slate-800 flex-col items-center py-6 gap-8 shrink-0 z-50">
-        <div className="w-12 h-12 bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-500/20 mb-4">
-          <span className="text-3xl font-black italic text-white flex items-center justify-center leading-none mt-1">Z</span>
-        </div>
-        {tabs.map((tab) => {
-          const isActive = currentTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setCurrentTab(tab.id)}
-              className={`flex flex-col items-center gap-1.5 w-full transition-colors ${
-                isActive ? "text-pink-500" : "text-slate-500 hover:text-pink-400"
-              }`}
-            >
-              <div className={`${isActive ? "scale-110 drop-shadow-md" : "scale-100"} transition-transform duration-200`}>
-                {tab.icon}
-              </div>
-              <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
-            </button>
-          );
-        })}
-      </aside>
+      {currentTab !== 'games' && (
+        <aside className="hidden md:flex w-24 bg-slate-900/50 backdrop-blur-md border-r border-slate-800 flex-col items-center py-6 gap-8 shrink-0 z-50">
+          <Logo size="md" />
+          {tabs.map((tab) => {
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setCurrentTab(tab.id)}
+                className={`flex flex-col items-center gap-1.5 w-full transition-colors ${
+                  isActive ? "text-pink-500" : "text-slate-500 hover:text-pink-400"
+                }`}
+              >
+                <div className={`${isActive ? "scale-110 drop-shadow-md" : "scale-100"} transition-transform duration-200`}>
+                  {tab.icon}
+                </div>
+                <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
+              </button>
+            );
+          })}
+        </aside>
+      )}
 
       {/* Main App Container */}
       <div className="flex-1 h-[100dvh] flex flex-col overflow-hidden relative w-full shadow-2xl shadow-indigo-500/10">
@@ -143,33 +144,37 @@ export default function App() {
         </div>
 
         {/* Global Floating Action Button for Create Post */}
-        <button 
-          onClick={() => setIsTagModalOpen({isOpen: true})}
-          className="absolute bottom-20 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-gradient-to-tr from-pink-500 to-orange-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-pink-500/30 hover:scale-105 transition-transform z-40"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
+        {currentTab !== 'games' && (
+          <button 
+            onClick={() => setIsTagModalOpen({isOpen: true})}
+            className="absolute bottom-24 md:bottom-8 right-4 md:right-8 w-14 h-14 bg-gradient-to-tr from-pink-500 to-orange-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-pink-500/30 hover:scale-105 transition-transform z-40"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        )}
 
         {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden bg-slate-900/50 backdrop-blur-md border-t border-slate-800 px-2 py-3 flex justify-between items-center z-50 shrink-0 pb-safe">
-          {tabs.map((tab) => {
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setCurrentTab(tab.id)}
-                className={`flex flex-col items-center gap-1 w-full transition-colors ${
-                  isActive ? "text-pink-500" : "text-slate-500 hover:text-pink-400"
-                }`}
-              >
-                <div className={`${isActive ? "scale-110 shadow-glow" : "scale-100"} transition-transform duration-200`}>
-                  {tab.icon}
-                </div>
-                <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {currentTab !== 'games' && (
+          <nav className="md:hidden bg-slate-900/50 backdrop-blur-md border-t border-slate-800 px-2 py-3 flex justify-between items-center z-50 shrink-0 pb-safe">
+            {tabs.map((tab) => {
+              const isActive = currentTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setCurrentTab(tab.id)}
+                  className={`flex flex-col items-center gap-1 w-full transition-colors ${
+                    isActive ? "text-pink-500" : "text-slate-500 hover:text-pink-400"
+                  }`}
+                >
+                  <div className={`${isActive ? "scale-110 shadow-glow" : "scale-100"} transition-transform duration-200`}>
+                    {tab.icon}
+                  </div>
+                  <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       <CreatePostModal isOpen={isTagModalOpen.isOpen} prefillTagged={isTagModalOpen.taggedFriend} onClose={() => setIsTagModalOpen({isOpen: false})} />

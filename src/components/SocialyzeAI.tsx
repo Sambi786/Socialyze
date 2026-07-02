@@ -2,12 +2,13 @@ import React, { useState, useRef, useEffect } from "react";
 import Markdown from "react-markdown";
 import { Send, Bot, Sparkles, Loader2, Menu } from "lucide-react";
 import { MOCK_USER, MOCK_FRIENDS } from "../data";
+import { Logo } from "./Logo";
 
 type Message = { role: "user" | "model"; text: string };
 
-export function ZocialyseAI() {
+export function SocialyzeAI() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: "model", text: "Hey! I'm ZocialAI. Want to chat, or should I generate an advanced personal insight report for your profile?" }
+    { role: "model", text: "Hey! I'm SocialAI. Want to chat, or should I generate an advanced personal insight report for your profile?" }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +40,7 @@ export function ZocialyseAI() {
       const data = await res.json();
       setMessages([...newMessages, { role: "model", text: data.text }]);
     } catch (err) {
-      setMessages([...newMessages, { role: "model", text: "**Error:** Could not reach ZocialAI." }]);
+      setMessages([...newMessages, { role: "model", text: "**Error:** Could not reach SocialAI." }]);
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +75,9 @@ export function ZocialyseAI() {
       {/* Header */}
       <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between shrink-0 backdrop-blur-md z-20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Bot className="w-6 h-6 text-white" />
-          </div>
+          <Logo size="sm" />
           <div>
-            <h1 className="text-xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 uppercase leading-tight">ZocialAI</h1>
+            <h1 className="text-xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 uppercase leading-tight">SocialAI</h1>
             <span className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">Neural Insights</span>
           </div>
         </div>
@@ -146,7 +145,7 @@ export function ZocialyseAI() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask ZocialAI anything..."
+          placeholder="Ask SocialAI anything..."
           className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-full px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors text-sm min-w-0"
         />
         <button 

@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Settings, ChevronRight, Grid3x3, LayoutList, Flame, Moon, Sun, Camera, Play, Heart, Edit3, X, Save, AlertTriangle, Trophy } from "lucide-react";
 import { useTheme } from "../lib/theme";
 import { useAppContext } from "../AppContext";
+import { Logo } from "./Logo";
 
-export function ZocialyseProfile({ onLogout, onNavigateToPost }: { onLogout: () => void, onNavigateToPost?: (type: string) => void }) {
+export function SocialyzeProfile({ onLogout, onNavigateToPost }: { onLogout: () => void, onNavigateToPost?: (type: string) => void }) {
   const { theme, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const { user, userPosts, likePost, updateUser, deleteAccount } = useAppContext();
@@ -38,7 +39,10 @@ export function ZocialyseProfile({ onLogout, onNavigateToPost }: { onLogout: () 
     <div className="h-full bg-slate-950 flex flex-col overflow-y-auto">
       {/* Header */}
       <div className="p-4 flex justify-between items-center sticky top-0 bg-slate-900/50 backdrop-blur-md z-20 border-b border-slate-800">
-        <h1 className="text-xl font-black tracking-tighter uppercase text-white">{user.username}</h1>
+        <div className="flex items-center gap-2">
+          <Logo size="sm" />
+          <h1 className="text-xl font-black tracking-tighter uppercase text-white hidden md:block">{user.username}</h1>
+        </div>
         <button onClick={() => setShowEditModal(true)} className="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center border border-slate-700/50 hover:bg-slate-700/50 transition-colors">
           <Settings className="w-5 h-5 text-slate-400" />
         </button>

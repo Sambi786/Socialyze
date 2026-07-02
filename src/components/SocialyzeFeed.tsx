@@ -6,8 +6,9 @@ import { ShareModal } from "./ShareModal";
 import { useAppContext } from "../AppContext";
 import { ReactionButton } from "./ReactionButton";
 import { toast } from "../lib/toast";
+import { Logo } from "./Logo";
 
-export function ZocialyseFeed() {
+export function SocialyzeFeed() {
   const { reels, likePost, addFriend, friends, user } = useAppContext();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [itemToShare, setItemToShare] = useState<{url: string, title: string} | null>(null);
@@ -24,6 +25,10 @@ export function ZocialyseFeed() {
 
   return (
     <>
+      {/* Floating Logo */}
+      <div className="absolute top-4 left-4 z-50 md:hidden drop-shadow-2xl">
+        <Logo size="sm" />
+      </div>
       <PullToRefresh onRefresh={handleRefresh} scrollClassName="snap-y snap-mandatory bg-slate-950">
         {reels.map((reel) => {
           const isFollowing = friends.some(f => f.id === reel.author.id) || reel.author.id === user?.id;

@@ -41,6 +41,20 @@
 }
 
 @layer base {
+  html, body {
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+  }
+  
+  #root {
+    height: 100dvh;
+    width: 100%;
+    overflow: hidden;
+  }
+
   html.theme-light {
     --color-slate-950: oklch(98.4% 0.003 247.858);
     --color-slate-900: oklch(96.8% 0.007 247.896);

@@ -7,7 +7,7 @@ export function useTheme() {
 
   useEffect(() => {
     // Check localStorage on mount
-    const savedTheme = localStorage.getItem('zocialyse-theme') as Theme | null;
+    const savedTheme = localStorage.getItem('socialyze-theme') as Theme | null;
     if (savedTheme) {
       setTheme(savedTheme);
       if (savedTheme === 'light') {
@@ -21,7 +21,7 @@ export function useTheme() {
   const toggleTheme = () => {
     setTheme(prev => {
       const newTheme = prev === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('zocialyse-theme', newTheme);
+      localStorage.setItem('socialyze-theme', newTheme);
       
       if (newTheme === 'light') {
         document.documentElement.classList.add('theme-light');

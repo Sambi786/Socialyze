@@ -3,10 +3,11 @@ import { Camera, Search, Flame, MapPin, Sparkles, Gift, Edit3, MessageCircle, Se
 import { cn } from "../lib/utils";
 import { toast } from "../lib/toast";
 import { useAppContext, GroupChat } from "../AppContext";
-import { ZocialyseCamera } from "./ZocialyseCamera";
+import { SocialyzeCamera } from "./SocialyzeCamera";
+import { Logo } from "./Logo";
 import { User } from "../data";
 
-export function ZocialyseSocial({ onOpenCreatePost }: { onOpenCreatePost?: (friendName?: string) => void }) {
+export function SocialyzeSocial({ onOpenCreatePost }: { onOpenCreatePost?: (friendName?: string) => void }) {
   const { user, users, friends, groups, messages, sendMessage, createGroup, addFriend } = useAppContext();
   const [activeTab, setActiveTab] = useState<"chat" | "camera" | "search">("chat");
   const [leaderboardScope, setLeaderboardScope] = useState<"friends" | "global">("friends");
@@ -194,7 +195,7 @@ export function ZocialyseSocial({ onOpenCreatePost }: { onOpenCreatePost?: (frie
 
   if (activeTab === "camera") {
     return (
-      <ZocialyseCamera 
+      <SocialyzeCamera 
         onClose={() => setActiveTab("chat")} 
         onSendToFriend={(friendId, text) => {
           sendMessage(friendId, text);
@@ -257,7 +258,10 @@ export function ZocialyseSocial({ onOpenCreatePost }: { onOpenCreatePost?: (frie
         <div onClick={() => setActiveTab("search")} className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center cursor-pointer border border-slate-700 hover:bg-slate-700 transition">
           <Search className="w-5 h-5 text-slate-400" />
         </div>
-        <h1 className="text-xl font-black tracking-tighter">CHAT</h1>
+        <div className="flex items-center gap-2">
+          <Logo size="sm" />
+          <h1 className="text-xl font-black tracking-tighter hidden md:block">CHAT</h1>
+        </div>
         <div 
           className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-500 flex items-center justify-center cursor-pointer shadow-lg shadow-purple-500/20"
           onClick={() => setActiveTab("camera")}

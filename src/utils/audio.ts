@@ -1,4 +1,4 @@
-export const playArcadeSound = (type: 'shoot' | 'goal' | 'miss' | 'bounce' | 'swish' | 'bowl' | 'hit' | 'out' | 'cheer') => {
+export const playArcadeSound = (type: 'shoot' | 'goal' | 'miss' | 'bounce' | 'swish' | 'bowl' | 'hit' | 'out' | 'cheer' | 'ooh') => {
   try {
     const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioContext) return;
@@ -89,6 +89,15 @@ export const playArcadeSound = (type: 'shoot' | 'goal' | 'miss' | 'bounce' | 'sw
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
       osc.start(now);
       osc.stop(now + 0.1);
+    } else if (type === 'ooh') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(250, now);
+      osc.frequency.linearRampToValueAtTime(200, now + 0.4);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.4, now + 0.2);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      osc.start(now);
+      osc.stop(now + 0.5);
     }
   } catch (e) {
     console.error("Audio playback failed", e);

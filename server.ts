@@ -22,14 +22,14 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // API Route: Multi-turn Chatbot (Zocialyse AI)
+  // API Route: Multi-turn Chatbot (Socialyze AI)
   app.post("/api/chat", async (req, res) => {
     try {
       const { history, message } = req.body;
       
       const systemInstruction = 
-        "You are ZocialAI, an advanced AI analyst and friendly chatbot for Zocialyse. " +
-        "Zocialyse is an all-in-one social app (Reels, Streaks, Filters, Live, Birthdays). " +
+        "You are SocialAI, an advanced AI analyst and friendly chatbot for Socialyze. " +
+        "Socialyze is an all-in-one social app (Reels, Streaks, Filters, Live, Birthdays). " +
         "You analyze user social trends and offer insights, or just chat in a friendly, helpful way. " +
         "Keep your answers concise and engaging, natively incorporating social media slang if appropriate.";
 
@@ -60,8 +60,8 @@ async function startServer() {
       const { profileData } = req.body;
       
       const systemInstruction = 
-        "You are ZocialAI Analyst. You provide an advanced, fun, engaging, and personal data analysis report " +
-        "for the user based on their mock Zocialyse profile data. Be upbeat and include some emojis.";
+        "You are SocialAI Analyst. You provide an advanced, fun, engaging, and personal data analysis report " +
+        "for the user based on their mock Socialyze profile data. Be upbeat and include some emojis.";
 
       const response = await getAI().models.generateContent({
         model: "gemini-2.5-flash",

@@ -23,8 +23,8 @@ export type Post = {
 
 export const MOCK_USER: User = {
   id: "u1",
-  username: "zocial_star",
-  avatar: "https://i.pravatar.cc/150?u=zocial_star",
+  username: "social_star",
+  avatar: "https://i.pravatar.cc/150?u=social_star",
   streaks: 42,
   birthDate: "2000-05-03"
 };

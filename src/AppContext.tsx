@@ -50,7 +50,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [hasSeenDemo, setHasSeenDemo] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('zocialyse-db');
+    const saved = localStorage.getItem('socialyze-db');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -69,7 +69,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const saveState = (newState: Partial<AppState>) => {
-    localStorage.setItem('zocialyse-db', JSON.stringify({
+    localStorage.setItem('socialyze-db', JSON.stringify({
       user: newState.user !== undefined ? newState.user : user,
       users: newState.users || users,
       friends: newState.friends || friends,
@@ -147,7 +147,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         url: "https://images.unsplash.com/photo-1516245834210-c4c142787335?auto=format&fit=crop&q=80&w=600&h=1000",
         likes: 0,
         comments: 0,
-        description: `Hey everyone! I just joined Zocialyse 🎉 Say hi!`
+        description: `Hey everyone! I just joined Socialyze 🎉 Say hi!`
       };
 
       nextReels = [welcomePost, ...nextReels];
