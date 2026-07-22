@@ -897,13 +897,27 @@ export function SocialyzeSocial({ onOpenCreatePost }: { onOpenCreatePost?: (frie
           <div className="flex justify-center mb-6">
             <div className="bg-slate-800 text-slate-400 text-xs px-3 py-1 rounded-full font-medium">Today</div>
           </div>
-          {chatMessages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.sender === user?.id ? 'justify-end' : 'justify-start'}`}>
-              <div className={`px-4 py-2 rounded-2xl max-w-[75%] ${msg.sender === user?.id ? `${bubbleColor} rounded-br-sm` : `${otherBubbleColor} rounded-bl-sm`}`}>
-                {msg.text}
+          {chatMessages.map((msg: any, i: number) => {
+            const isMe = msg.sender === user?.id;
+            const senderUser = users.find(u => u.id === msg.sender);
+            const showSenderInfo = !isMe && isGroup;
+
+            return (
+              <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`}>
+                {showSenderInfo && senderUser && (
+                  <img src={senderUser.avatar} alt={senderUser.username} className="w-8 h-8 rounded-full mr-2 self-end mb-1" />
+                )}
+                <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
+                  {showSenderInfo && senderUser && (
+                    <span className="text-[10px] text-slate-500 font-bold mb-0.5 ml-2">{senderUser.username}</span>
+                  )}
+                  <div className={`px-4 py-2 rounded-2xl ${isMe ? `${bubbleColor} rounded-br-sm` : `${otherBubbleColor} rounded-bl-sm`}`}>
+                    {msg.text}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {typingStatus[activeChat.id]?.some(id => id !== user?.id) && (
             <div className="flex justify-start mb-2">
               {'members' in activeChat && (
