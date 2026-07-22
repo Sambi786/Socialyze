@@ -12,9 +12,10 @@ interface ReactionButtonProps {
   iconClassName?: string;
   textClassName?: string;
   heartIcon?: React.ReactNode;
+  onReact?: (emoji: string) => void;
 }
 
-export function ReactionButton({ postId, type, likes, className, iconClassName, textClassName, heartIcon }: ReactionButtonProps) {
+export function ReactionButton({ postId, type, likes, className, iconClassName, textClassName, heartIcon, onReact }: ReactionButtonProps) {
   const { likePost } = useAppContext();
   const [showReactions, setShowReactions] = useState(false);
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
@@ -45,7 +46,11 @@ export function ReactionButton({ postId, type, likes, className, iconClassName, 
   };
 
   const handleReact = (emoji: string) => {
-    likePost(postId, type);
+    if (onReact) {
+      onReact(emoji);
+    } else {
+      likePost(postId, type);
+    }
     setSelectedEmoji(emoji);
 
     // Create flying effect

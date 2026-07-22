@@ -6,9 +6,9 @@ import { toast } from '../lib/toast';
 import { ShareModal } from './ShareModal';
 
 const GROUNDS = [
-  { id: 'london', name: 'London Oval', light: '#4ade80', dark: '#22c55e', pitch: '#d9b382', text: 'text-emerald-800', bg: 'bg-gradient-to-b from-blue-400 to-blue-200' },
-  { id: 'mumbai', name: 'Mumbai Stadium', light: '#a3e635', dark: '#65a30d', pitch: '#cd853f', text: 'text-orange-900', bg: 'bg-gradient-to-b from-orange-400 to-orange-200' },
-  { id: 'socialyze', name: 'Socialyze Night', light: '#0d9488', dark: '#0f766e', pitch: '#78716c', text: 'text-cyan-400', bg: 'bg-gradient-to-b from-slate-900 to-slate-800' },
+  { id: 'mumbai', name: 'Mumbai', entryFee: 250, prize: 500, light: '#a3e635', dark: '#65a30d', pitch: '#cd853f', text: 'text-orange-900', bg: 'bg-gradient-to-b from-orange-400 to-orange-200' },
+  { id: 'london', name: 'London', entryFee: 1000, prize: 2000, light: '#4ade80', dark: '#22c55e', pitch: '#d9b382', text: 'text-emerald-800', bg: 'bg-gradient-to-b from-blue-400 to-blue-200' },
+  { id: 'melbourne', name: 'Melbourne', entryFee: 5000, prize: 10000, light: '#0d9488', dark: '#0f766e', pitch: '#78716c', text: 'text-cyan-400', bg: 'bg-gradient-to-b from-red-600 to-red-400' },
 ];
 
 const BATS = [
@@ -39,6 +39,7 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
   const { user, updateUser } = useAppContext();
   
   const [phase, setPhase] = useState<GamePhase>('setup');
+  const [menuTab, setMenuTab] = useState<'home' | 'play' | 'store'>('home');
   const [format, setFormat] = useState<MatchFormat>('quick');
   
   const [myTeam, setMyTeam] = useState(TEAMS[0]);
@@ -61,7 +62,18 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
 
   const [showFieldMap, setShowFieldMap] = useState(false);
   const [showBowlerSelect, setShowBowlerSelect] = useState(false);
-  const [fielders, setFielders] = useState<{id: number, x: number, y: number}[]>([...Array(9)].map((_, i) => ({ id: i, x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 })));
+    const defaultFielders = [
+      { id: 0, x: 45, y: 15 }, // Wicket Keeper
+      { id: 1, x: 30, y: 30 }, // Point
+      { id: 2, x: 20, y: 50 }, // Cover
+      { id: 3, x: 35, y: 70 }, // Mid-off
+      { id: 4, x: 65, y: 70 }, // Mid-on
+      { id: 5, x: 80, y: 50 }, // Mid-wicket
+      { id: 6, x: 75, y: 30 }, // Square leg
+      { id: 7, x: 65, y: 10 }, // Fine leg
+      { id: 8, x: 25, y: 10 }, // Third man
+  ];
+  const [fielders, setFielders] = useState<{id: number, x: number, y: number}[]>(defaultFielders);
   const [draggedFielder, setDraggedFielder] = useState<number | null>(null);
   
   // Game states
@@ -78,6 +90,13 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
   
   // Bowling specific states
   const [aimX, setAimX] = useState(50);
+
+  const { completeMission } = useAppContext();
+  useEffect(() => {
+    if (phase === 'result') {
+      completeMission('win_match', 50);
+    }
+  }, [phase, completeMission]);
   const aimDirectionRef = useRef(1);
   const aimRafRef = useRef<number>(0);
   
@@ -485,159 +504,283 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
   }, []);
 
   // --- RENDERERS ---
-  if (phase === 'setup') {
+    if (phase === 'setup') {
       return (
-          <div className="h-full bg-slate-950 text-white flex flex-col items-center justify-start p-6 relative overflow-y-auto">
-              <button onClick={onExit} className="absolute top-4 left-4 z-50 p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors border border-slate-700">
-                  <ArrowLeft className="w-6 h-6 text-slate-300" />
-              </button>
+          <div className="h-full bg-slate-950 text-white flex flex-col relative overflow-hidden font-sans">
               
-              <div className="w-full max-w-md mt-12 flex flex-col gap-6 pb-20">
-                  <div className="text-center mb-4">
-                      <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 uppercase drop-shadow-lg">
-                          Socialyze League
-                      </h1>
-                      <p className="text-slate-400 text-sm font-bold tracking-widest mt-1 uppercase">T20 Cricket Clash</p>
-                  </div>
-                  
-                  {/* Format Selection */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex gap-2">
-                      <button 
-                        onClick={() => setFormat('quick')}
-                        className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-wide text-sm transition-all ${format === 'quick' ? 'bg-indigo-500 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
-                      >Quick Match</button>
-                      <button 
-                        onClick={() => toast({ title: 'League Mode', message: 'League mode unlocking soon!', icon: 'flame' })}
-                        className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-wide text-sm transition-all bg-slate-800 text-slate-500 cursor-not-allowed`}
-                      >League (Lock)</button>
-                  </div>
+              {/* Top Bar - Socialize League Style */}
+              <div className="absolute top-0 inset-x-0 p-4 flex justify-between items-center z-50 bg-slate-950/80 backdrop-blur-xl border-b border-white/5">
+                 <div className="flex items-center gap-3 bg-white/5 rounded-full pr-5 pl-1 py-1 border border-white/10 shadow-lg backdrop-blur-md">
+                     <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center font-black text-white shadow-inner">
+                        {user?.username?.[0]?.toUpperCase() || 'U'}
+                     </div>
+                     <span className="font-bold text-white text-sm tracking-wide">{user?.username || 'Player_9381'}</span>
+                 </div>
+                 <div className="flex gap-3">
+                     <div className="flex items-center bg-white/5 rounded-full px-3 py-1.5 border border-white/10 shadow-lg backdrop-blur-md">
+                         <div className="w-6 h-6 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-[12px] font-black mr-2 shadow-sm">S</div>
+                         <span className="font-black text-white text-sm mr-2">25,500</span>
+                         <div className="w-6 h-6 bg-white/10 rounded-full flex items-center justify-center text-white text-lg leading-none hover:bg-white/20 cursor-pointer transition-colors">+</div>
+                     </div>
+                 </div>
+              </div>
 
-                  {/* Ground Selection */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">
-                          <MapPin className="w-4 h-4" /> Select Ground
-                      </label>
-                      <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
-                          {GROUNDS.map(g => (
-                              <button 
-                                key={g.id}
-                                onClick={() => setGround(g)}
-                                className={`snap-center shrink-0 w-32 h-20 rounded-xl border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all ${ground.id === g.id ? 'border-cyan-400 scale-105 shadow-[0_0_15px_rgba(34,211,238,0.3)]' : 'border-slate-700 opacity-70 hover:opacity-100'}`}
-                              >
-                                  <div className={`absolute inset-0 ${g.bg}`} />
-                                  <div className={`absolute bottom-0 inset-x-0 h-[60%]`} style={{ background: `repeating-linear-gradient(0deg, ${g.light}, ${g.light} 5px, ${g.dark} 5px, ${g.dark} 10px)` }} />
-                                  <div className={`absolute bottom-0 inset-x-1/4 w-1/2 h-1/2`} style={{ backgroundColor: g.pitch }} />
-                                  <span className={`relative z-10 font-black text-sm tracking-wide bg-white/80 px-2 rounded-md shadow-sm ${g.text}`}>{g.name}</span>
-                              </button>
-                          ))}
+              {menuTab === 'home' && (
+                  <div className="flex-1 flex flex-col items-center justify-center relative bg-gradient-to-b from-slate-900 to-slate-950">
+                      {/* Cool Hexagon Background */}
+                      <div className="absolute inset-0 opacity-20 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
+                      <div className="absolute bottom-[20%] w-96 h-96 bg-purple-600/20 rounded-full blur-[100px]" />
+                      <div className="absolute top-[20%] w-64 h-64 md:w-96 md:h-96 bg-indigo-600/20 rounded-full blur-[100px]" />
+                      
+                      {/* Logo Area */}
+                      <div className="absolute top-[18%] flex flex-col items-center z-30 animate-pulse" style={{ animationDuration: '3s' }}>
+                          <h1 className="text-5xl md:text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 drop-shadow-2xl">
+                              SOCIALIZE
+                          </h1>
+                          <h2 className="text-3xl md:text-4xl font-black tracking-widest text-white uppercase drop-shadow-lg -mt-2">
+                              League
+                          </h2>
                       </div>
-                  </div>
 
-                  {/* Equipment Selection */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
-                      <div>
-                          <label className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">
-                              <Zap className="w-4 h-4" /> Select Bat
-                          </label>
-                          <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
-                              {BATS.map(bat => (
-                                  <button 
-                                    key={bat.id}
-                                    onClick={() => setSelectedBat(bat)}
-                                    className={`snap-center shrink-0 w-32 p-3 rounded-xl border-2 flex flex-col items-center justify-center relative transition-all ${selectedBat.id === bat.id ? 'border-amber-400 bg-amber-500/10 scale-105' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}
+                      {/* Character Customization (Team/Bat) */}
+                      <div className="absolute left-2 sm:left-6 top-[55%] -translate-y-1/2 flex flex-col gap-4 z-30">
+                          <div className="bg-slate-900/60 p-3 rounded-3xl border border-white/10 backdrop-blur-xl flex flex-col gap-3 shadow-2xl">
+                              <span className="text-indigo-300 text-[10px] font-black uppercase text-center tracking-widest">Team</span>
+                              <div className="flex flex-col gap-2">
+                              {TEAMS.map(team => (
+                                  <button
+                                      key={team.name}
+                                      onClick={() => { setMyTeam(team); if(opponent.name === team.name) setOpponent(TEAMS.find(t => t.name !== team.name)!); }}
+                                      className={`w-8 h-8 md:w-10 md:h-10 rounded-full border-2 flex items-center justify-center text-lg transition-all duration-300 ${myTeam.name === team.name ? 'border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.5)] ' + team.color : 'border-white/10 bg-white/5 opacity-60 hover:opacity-100 hover:scale-105'}`}
+                                      title={team.name}
                                   >
-                                      <div className={`w-3 h-12 rounded-b-md shadow-sm mb-2 relative ${bat.color}`}>
-                                          <div className="absolute -top-3 left-[2px] w-1.5 h-3 bg-slate-400 rounded-t-sm" />
-                                      </div>
-                                      <span className="font-bold text-[10px] tracking-wide text-white">{bat.name}</span>
-                                      <div className="flex gap-2 mt-1 w-full justify-between px-2 text-[8px] text-slate-400">
-                                        <span>PWR {bat.power}</span>
-                                        <span>TIM {bat.timing}</span>
-                                      </div>
+                                      {team.flag}
                                   </button>
                               ))}
+                              </div>
                           </div>
                       </div>
 
-                      <div>
-                          <label className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">
-                              <Zap className="w-4 h-4" /> Select Ball
-                          </label>
-                          <div className="flex gap-3 overflow-x-auto pb-2 snap-x hide-scrollbar">
-                              {BALLS.map(ball => (
-                                  <button 
-                                    key={ball.id}
-                                    onClick={() => setSelectedBall(ball)}
-                                    className={`snap-center shrink-0 w-32 p-3 rounded-xl border-2 flex flex-col items-center justify-center relative transition-all ${selectedBall.id === ball.id ? 'border-red-400 bg-red-500/10 scale-105' : 'border-slate-700 bg-slate-800/50 hover:border-slate-500'}`}
+                      <div className="absolute right-2 sm:right-6 top-[55%] -translate-y-1/2 flex flex-col gap-4 z-30">
+                          <div className="bg-slate-900/60 p-3 rounded-3xl border border-white/10 backdrop-blur-xl flex flex-col gap-3 shadow-2xl">
+                              <span className="text-indigo-300 text-[10px] font-black uppercase text-center tracking-widest">Bat</span>
+                              <div className="flex flex-col gap-2">
+                              {BATS.map(bat => (
+                                  <button
+                                      key={bat.id}
+                                      onClick={() => setSelectedBat(bat)}
+                                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 ${selectedBat.id === bat.id ? 'border-purple-400 scale-110 shadow-[0_0_15px_rgba(168,85,247,0.5)] bg-slate-800' : 'border-white/10 bg-white/5 opacity-60 hover:opacity-100 hover:scale-105'}`}
+                                      title={bat.name}
                                   >
-                                      <div className="w-8 h-8 rounded-full shadow-[inset_-2px_-2px_5px_rgba(0,0,0,0.5)] mb-2 relative" style={{ backgroundColor: ball.color }}>
-                                          <div className="absolute inset-0 flex items-center justify-center">
-                                              <div className="w-full h-[1px] bg-white/40 rotate-45" />
+                                      <div className={`w-1.5 h-4 md:w-2 md:h-5 ${bat.color} rounded-sm`} />
+                                  </button>
+                              ))}
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Character Avatar - Modernized */}
+                      <div className="absolute bottom-[28%] flex flex-col items-center">
+                          <div className="relative group cursor-pointer hover:scale-105 transition-transform duration-500">
+                              {/* Glow behind */}
+                              <div className="absolute inset-0 bg-indigo-500/30 rounded-full blur-2xl group-hover:bg-purple-500/40 transition-colors" />
+                              <div className={`w-32 h-44 md:w-40 md:h-56 ${myTeam.uniform} rounded-t-[40px] md:rounded-t-[60px] rounded-b-3xl relative flex flex-col items-center justify-start pt-6 border border-white/20 shadow-2xl z-10 overflow-hidden`}>
+                                  {/* Jersey details */}
+                                  <div className="w-full h-4 bg-black/20 absolute top-12" />
+                                  <div className="w-8 h-full bg-black/10 absolute left-4 skew-x-12" />
+                                  
+                                  <div className="w-16 h-20 md:w-20 md:h-24 bg-amber-200/90 rounded-full absolute -top-14 border border-white/20 overflow-hidden flex flex-col items-center pt-3 shadow-inner">
+                                      <div className={`w-full h-10 ${myTeam.helmet} absolute top-0 shadow-md`} />
+                                      {/* Visor */}
+                                      <div className="w-10 h-3 md:w-12 md:h-4 bg-black/80 rounded-full absolute top-5 md:top-6" />
+                                  </div>
+                                  <div className="absolute right-[-10px] top-20 rotate-[25deg] origin-top drop-shadow-2xl">
+                                      <div className={`w-6 h-32 md:w-8 md:h-40 ${selectedBat.color} rounded-b-2xl shadow-2xl border border-white/20 relative overflow-hidden`}>
+                                          <div className="absolute top-0 inset-x-0 h-12 bg-black/80 rounded-t-sm" />
+                                          <div className="absolute bottom-4 inset-x-2 h-16 bg-white/10 rounded-sm" />
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Giant PLAY button - Cyberpunk/Neon style */}
+                      <div className="absolute bottom-[12%] md:bottom-[10%] w-full px-4 md:px-8 flex justify-center z-20">
+                          <button 
+                              onClick={() => setMenuTab('play')}
+                              className="w-full max-w-sm py-4 md:py-5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-black rounded-3xl shadow-[0_0_40px_rgba(168,85,247,0.5)] text-3xl uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all relative overflow-hidden group"
+                          >
+                              <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover:translate-x-full transition-transform duration-700 skew-x-12" />
+                              Let's Play
+                          </button>
+                      </div>
+                  </div>
+              )}
+
+              {menuTab === 'play' && (
+                  <div className="flex-1 flex flex-col relative bg-slate-950 pt-16">
+                      <div className="absolute inset-0 opacity-30 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-purple-900 via-slate-900 to-black pointer-events-none" />
+                      
+                      <div className="w-full mt-10 mb-4 flex flex-col items-center z-10">
+                          <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 uppercase drop-shadow-lg text-center">
+                              Online Matches
+                          </h1>
+                          <p className="text-slate-400 font-medium tracking-wide mt-2 text-sm uppercase">Select an arena to challenge players</p>
+                      </div>
+                      
+                      <div className="w-full flex-1 flex flex-col justify-center relative z-10">
+                          <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory px-4 pb-8 pt-4 hide-scrollbar items-center">
+                              {GROUNDS.map((g, index) => (
+                                  <div 
+                                      key={g.id}
+                                      className={`snap-center shrink-0 w-[240px] md:w-[280px] h-[280px] md:h-[400px] rounded-[2rem] relative overflow-hidden transition-all duration-500 ${ground.id === g.id ? 'scale-100 shadow-[0_0_50px_rgba(168,85,247,0.4)] border border-purple-500' : 'scale-90 border border-white/10 opacity-60 hover:opacity-100 cursor-pointer hover:scale-95'}`}
+                                      onClick={() => setGround(g)}
+                                  >
+                                      {/* Background */}
+                                      <div className={`absolute inset-0 ${g.bg}`} />
+                                      <div className={`absolute bottom-0 inset-x-0 h-[50%]`} style={{ background: `repeating-linear-gradient(0deg, ${g.light}, ${g.light} 10px, ${g.dark} 10px, ${g.dark} 20px)` }} />
+                                      <div className={`absolute bottom-0 inset-x-[20%] w-[60%] h-[40%]`} style={{ backgroundColor: g.pitch }} />
+                                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent" />
+
+                                      {/* League Info */}
+                                      <div className="absolute inset-0 p-6 flex flex-col justify-between">
+                                          <div className="flex flex-col items-center mt-2">
+                                              <span className="text-indigo-400 text-[10px] font-black tracking-widest uppercase mb-2 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20 backdrop-blur-md">Tier {index + 1}</span>
+                                              <h2 className="text-3xl font-black text-white tracking-tighter uppercase drop-shadow-2xl text-center leading-none mt-2">{g.name}</h2>
+                                          </div>
+                                          
+                                          <div className="flex flex-col gap-3">
+                                              <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
+                                                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">Entry Fee</span>
+                                                  <span className="text-white font-black flex items-center gap-1.5 text-sm">
+                                                      <div className="w-5 h-5 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white text-[10px] font-black">S</div>
+                                                      {g.entryFee}
+                                                  </span>
+                                              </div>
+                                              <div className="flex justify-between items-center bg-purple-500/20 p-3 rounded-2xl border border-purple-500/30 backdrop-blur-md">
+                                                  <span className="text-purple-300 text-xs font-bold uppercase tracking-wider">Prize</span>
+                                                  <span className="text-purple-300 font-black flex items-center gap-1.5 text-sm">
+                                                      <div className="w-5 h-5 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-black">S</div>
+                                                      {g.prize}
+                                                  </span>
+                                              </div>
+                                              
+                                              {ground.id === g.id && (
+                                                  <button 
+                                                      onClick={(e) => { e.stopPropagation(); handleToss(); }}
+                                                      className="w-full mt-4 py-4 bg-white text-slate-950 font-black rounded-2xl uppercase tracking-widest shadow-[0_10px_30px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition-transform"
+                                                  >
+                                                      Matchmake
+                                                  </button>
+                                              )}
                                           </div>
                                       </div>
-                                      <span className="font-bold text-[10px] tracking-wide text-white">{ball.name}</span>
-                                      <div className="flex gap-2 mt-1 w-full justify-between px-2 text-[8px] text-slate-400">
-                                        <span>PAC {ball.pace}</span>
-                                        <span>SWG {ball.swing}</span>
-                                      </div>
-                                  </button>
+                                  </div>
                               ))}
                           </div>
                       </div>
                   </div>
-                  
-                  {/* Team Selection */}
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">
-                          <User className="w-4 h-4" /> Your Team
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                          {TEAMS.map(team => (
-                              <button 
-                                key={team.name}
-                                onClick={() => { setMyTeam(team); if(opponent.name === team.name) setOpponent(TEAMS.find(t => t.name !== team.name)!); }}
-                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${myTeam.name === team.name ? team.color : 'border-slate-800 bg-slate-800/50 text-slate-400'}`}
-                              >
-                                <span className="text-2xl drop-shadow-sm">{team.flag}</span>
-                                <span className="font-bold text-[10px] uppercase tracking-wide truncate w-full text-center">{team.name}</span>
-                              </button>
-                          ))}
-                      </div>
-                  </div>
-                  
-                  <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4">
-                      <label className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-3 uppercase tracking-widest">
-                           Opponent Team
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                          {TEAMS.map(team => (
-                              <button 
-                                key={team.name}
-                                onClick={() => setOpponent(team)}
-                                disabled={myTeam.name === team.name}
-                                className={`flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${opponent.name === team.name ? team.color : 'border-slate-800 bg-slate-800/50 text-slate-400'} ${myTeam.name === team.name ? 'opacity-20' : ''}`}
-                              >
-                                <span className="text-2xl drop-shadow-sm">{team.flag}</span>
-                                <span className="font-bold text-[10px] uppercase tracking-wide truncate w-full text-center">{team.name}</span>
-                              </button>
-                          ))}
-                      </div>
-                  </div>
+              )}
 
-                  <button 
-                    onClick={handleToss}
-                    className="w-full py-5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-xl rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] active:scale-[0.98] transition-all uppercase tracking-widest"
-                  >
-                     Start Match
+              {menuTab === 'store' && (
+                  <div className="flex-1 flex flex-col relative bg-slate-950 p-6 overflow-y-auto pt-24 pb-32">
+                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-900 via-slate-900 to-black pointer-events-none" />
+                      
+                      <div className="w-full mt-4 mb-8 flex flex-col items-center z-10">
+                          <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-orange-400 uppercase drop-shadow-lg text-center">
+                              Equipment Store
+                          </h1>
+                          <p className="text-slate-400 font-medium tracking-wide mt-2 text-sm uppercase">Upgrade your gear with Sambi bonuses</p>
+                      </div>
+
+                      <div className="w-full max-w-2xl mx-auto z-10 space-y-8">
+                          {/* Bats */}
+                          <div>
+                              <h2 className="text-2xl font-black text-white mb-4 flex items-center gap-2"><Zap className="text-pink-400" /> PRO BATS</h2>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                  {BATS.map((bat, i) => (
+                                      <div key={bat.id} onClick={() => setSelectedBat(bat)} className={`bg-white/5 border rounded-3xl p-4 flex flex-col items-center gap-3 backdrop-blur-md relative overflow-hidden group hover:border-pink-500/50 transition-colors cursor-pointer ${selectedBat.id === bat.id ? 'border-pink-500 shadow-[0_0_20px_rgba(236,72,153,0.3)]' : 'border-white/10'}`}>
+                                          <div className="absolute inset-0 bg-pink-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                          <div className={`w-4 h-24 ${bat.color} rounded-sm shadow-xl border border-white/20 rotate-[-20deg] my-2`} />
+                                          <div className="text-center">
+                                              <h3 className="font-bold text-white uppercase">{bat.name}</h3>
+                                              <div className="flex gap-1 justify-center text-xs text-slate-400 mt-1">Power: <span className="text-pink-400 font-black">+{Math.floor(bat.power * 10)}</span></div>
+                                          </div>
+                                          <button className={`w-full py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors mt-2 ${selectedBat.id === bat.id ? 'bg-pink-500 text-white' : 'bg-white/10 hover:bg-pink-500/80 hover:text-white'}`}>
+                                              {selectedBat.id === bat.id ? 'Equipped' : `Buy ${(i+1)*2500} S`}
+                                          </button>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+
+                          {/* Balls */}
+                          <div>
+                              <h2 className="text-2xl font-black text-white mb-4 flex items-center gap-2"><MapPin className="text-orange-400" /> ELITE BALLS</h2>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                  {BALLS.map((ball, i) => (
+                                      <div key={ball.id} onClick={() => setSelectedBall(ball)} className={`bg-white/5 border rounded-3xl p-4 flex flex-col items-center gap-3 backdrop-blur-md relative overflow-hidden group hover:border-orange-500/50 transition-colors cursor-pointer ${selectedBall.id === ball.id ? 'border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.3)]' : 'border-white/10'}`}>
+                                          <div className="absolute inset-0 bg-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                          <div className={`w-16 h-16 rounded-full shadow-[inset_-5px_-5px_15px_rgba(0,0,0,0.5)] my-2 relative`} style={{ background: `radial-gradient(circle at 30% 30%, ${ball.color}, ${ball.color === 'white' ? '#e2e8f0' : '#7f1d1d'})` }}>
+                                             {/* Seam */}
+                                             <div className="absolute inset-0 border-2 border-dashed border-black/20 rounded-full" style={{ transform: 'rotate(45deg)' }} />
+                                          </div>
+                                          <div className="text-center">
+                                              <h3 className="font-bold text-white uppercase">{ball.name}</h3>
+                                              <div className="flex flex-col gap-0.5 text-[10px] text-slate-400 mt-1">
+                                                <div>Pace: <span className="text-orange-400 font-black">+{Math.floor(ball.pace * 10)}</span></div>
+                                                <div>Swing: <span className="text-orange-400 font-black">+{Math.floor(ball.swing * 10)}</span></div>
+                                              </div>
+                                          </div>
+                                          <button className={`w-full py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors mt-2 ${selectedBall.id === ball.id ? 'bg-orange-500 text-white' : 'bg-white/10 hover:bg-orange-500/80 hover:text-white'}`}>
+                                              {selectedBall.id === ball.id ? 'Equipped' : `Buy ${(i+1)*1500} S`}
+                                          </button>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {/* Bottom Nav Bar - Modern UI */}
+              <div className="w-full bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 flex justify-around items-center px-4 py-4 pb-safe z-50 shadow-[0_-20px_40px_rgba(0,0,0,0.5)] absolute bottom-0">
+                  <button onClick={() => setMenuTab('home')} className={`flex flex-col items-center gap-1.5 transition-colors ${menuTab === 'home' ? 'text-indigo-400 scale-110' : 'text-slate-500 hover:text-slate-300'}`}>
+                      <div className={`p-0 rounded-xl`}>
+                          <User className="w-6 h-6" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest">Home</span>
+                  </button>
+                  <button onClick={() => setMenuTab('play')} className={`flex flex-col items-center gap-1.5 transition-colors ${menuTab === 'play' ? 'text-purple-400 scale-110' : 'text-slate-500 hover:text-slate-300'}`}>
+                      <div className={`p-0 rounded-xl`}>
+                          <Trophy className="w-6 h-6" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest">Leagues</span>
+                  </button>
+                  <button onClick={() => setMenuTab('store')} className={`flex flex-col items-center gap-1.5 transition-colors ${menuTab === 'store' ? 'text-pink-400 scale-110' : 'text-slate-500 hover:text-slate-300'}`}>
+                      <div className="p-0">
+                          <Zap className="w-6 h-6" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest">Store</span>
+                  </button>
+                  <button onClick={onExit} className="flex flex-col items-center gap-1.5 text-rose-500/70 hover:text-rose-400 transition-colors">
+                      <div className="p-0">
+                          <ArrowLeft className="w-6 h-6" />
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-widest">Exit</span>
                   </button>
               </div>
           </div>
       );
-  }
-
-  if (phase === 'toss' || phase === 'inning_break') {
+  }if (phase === 'toss' || phase === 'inning_break') {
       return (
-          <div className="h-full bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+          <div className="flex-1 w-full h-full bg-slate-950 flex flex-col items-center justify-center p-6 text-center relative">
+              <button 
+                onClick={onExit} 
+                className="absolute top-4 left-4 z-[100] p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors border border-slate-700"
+              >
+                  <ArrowLeft className="w-6 h-6 text-slate-300" />
+              </button>
               {phase === 'toss' && !umpireMsg && <Loader2 className="w-16 h-16 text-emerald-500 animate-spin mb-6" />}
               {phase === 'inning_break' && <Trophy className="w-16 h-16 text-yellow-500 mb-6" />}
               
@@ -687,14 +830,20 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
       const tie = userTotalScore === oppTotalScore && userWickets === oppWickets;
       
       return (
-          <div className="h-full bg-slate-950 text-white flex flex-col items-center justify-center p-6">
+          <div className="h-full bg-slate-950 text-white flex flex-col items-center justify-center p-6 relative">
+              <button 
+                onClick={onExit} 
+                className="absolute top-4 left-4 z-[100] p-2 bg-slate-800 rounded-full hover:bg-slate-700 transition-colors border border-slate-700"
+              >
+                  <ArrowLeft className="w-6 h-6 text-slate-300" />
+              </button>
               <div className="relative z-10 text-center mb-8">
                   <h2 className={`text-5xl md:text-6xl font-black mb-2 uppercase tracking-tighter drop-shadow-2xl ${userWon ? 'text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400' : tie ? 'text-slate-300' : 'text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500'}`}>
                     {userWon ? 'Victory!' : tie ? 'Match Tied!' : 'Defeat!'}
                   </h2>
               </div>
               
-              <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl w-full max-w-sm flex flex-col gap-6">
+              <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-3xl w-full max-w-sm flex flex-col gap-6 relative z-10">
                   <div className="flex justify-between items-center bg-slate-800/50 p-4 rounded-2xl">
                       <div className="flex flex-col items-center">
                           <span className="text-4xl mb-1">{myTeam.flag}</span>
@@ -707,20 +856,35 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
                       </div>
                   </div>
                   
-                  <button 
-                    onClick={() => {
-                        setPhase('setup');
-                        setTargetScore(0);
-                        setUserTotalScore(0);
-                        setOppTotalScore(0);
-                        setUserWickets(0);
-                        setOppWickets(0);
-                    }}
-                    className="w-full py-4 bg-indigo-500 text-white font-black rounded-xl uppercase tracking-widest shadow-lg shadow-indigo-500/30"
-                  >
-                      Play Again
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="flex-1 py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-xl uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Share2 className="w-5 h-5" /> Share
+                    </button>
+                    <button 
+                      onClick={() => {
+                          setPhase('setup');
+                          setTargetScore(0);
+                          setUserTotalScore(0);
+                          setOppTotalScore(0);
+                          setUserWickets(0);
+                          setOppWickets(0);
+                      }}
+                      className="flex-[2] py-4 bg-indigo-500 text-white font-black rounded-xl uppercase tracking-widest shadow-lg shadow-indigo-500/30"
+                    >
+                        Play Again
+                    </button>
+                  </div>
               </div>
+
+              <ShareModal 
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                title={`I ${userWon ? 'won' : 'played'} a Cricket match! ${myTeam.name}: ${userTotalScore}/${userWickets} vs ${opponent.name}: ${oppTotalScore}/${oppWickets}`}
+                url="https://images.unsplash.com/photo-1531415074968-036ba1b575da?auto=format&fit=crop&q=80&w=600"
+              />
           </div>
       );
   }
@@ -740,282 +904,207 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
           }
       }}
     >
-      {/* 3D Perspective Container */}
+      {/* Universal Exit Button */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onExit(); }} 
+        className="absolute top-4 left-4 z-[100] p-2 bg-black/50 backdrop-blur-md rounded-full hover:bg-black/70 transition-colors border border-white/10"
+      >
+        <ArrowLeft className="w-5 h-5 text-white" />
+      </button>
+            {/* 3D Perspective Container */}
+      
+<style>{
+`
+@keyframes legSwingLeft {
+  0% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(15deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(2px) rotate(-15deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes legSwingRight {
+  0% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(2px) rotate(-15deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-5px) rotate(15deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.95) translateY(2px); }
+}
+@keyframes swingBat {
+  0% { transform: rotate(25deg) translate(4px, 2px); }
+  40% { transform: rotate(-130deg) translate(-12px, -8px); }
+  100% { transform: rotate(-150deg) translate(-15px, -10px); }
+}
+`
+}</style>
+
       <div className="absolute inset-0 perspective-[800px] flex justify-center overflow-hidden z-10 pointer-events-none">
           {/* Ground Plane */}
           <div 
-            className="absolute top-[40%] w-[300%] h-[200%] origin-top rounded-[100%]" 
+            className="absolute top-[35%] w-[350%] h-[250%] origin-top rounded-[50%]" 
             style={{ 
-                transform: 'rotateX(65deg) translateY(-20%)',
-                background: `repeating-linear-gradient(0deg, ${ground.light}, ${ground.light} 40px, ${ground.dark} 40px, ${ground.dark} 80px)`,
-                boxShadow: 'inset 0 0 100px rgba(0,0,0,0.8)'
+                transform: 'rotateX(68deg) translateY(-15%)',
+                background: `radial-gradient(circle at 50% 50%, ${ground.light} 0%, ${ground.dark} 70%, #064e3b 100%)`,
+                boxShadow: 'inset 0 0 150px rgba(0,0,0,0.9)'
             }}
           >
+              {/* Grass Pattern overlay */}
+              <div 
+                  className="absolute inset-0 opacity-30" 
+                  style={{ background: `repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(0,0,0,0.1) 20px, rgba(0,0,0,0.1) 40px)` }}
+              />
+              
+              {/* Boundary Rope */}
+              <div className="absolute inset-[15%] rounded-[50%] border-[6px] border-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)] border-dashed" />
+              <div className="absolute inset-[15%] rounded-[50%] border-[2px] border-white opacity-50" />
+              
+              {/* 30 Yard Circle */}
+              <div className="absolute top-[30%] left-[35%] right-[35%] bottom-[30%] rounded-[50%] border-[3px] border-white/50 border-dotted" />
+
               {/* The Pitch */}
               <div 
-                className="absolute top-[30%] left-1/2 -translate-x-1/2 w-[180px] h-[700px] border-[3px] border-white/20 shadow-2xl"
-                style={{ backgroundColor: ground.pitch }}
+                className="absolute top-[28%] left-1/2 -translate-x-1/2 w-[140px] h-[650px] border-[2px] border-white/30 shadow-2xl rounded-sm"
+                style={{ 
+                    backgroundColor: ground.pitch,
+                    backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 10px)'
+                }}
               >
                   {/* Creases */}
-                  <div className="absolute top-[10%] w-full h-[4px] bg-white opacity-90" />
-                  <div className="absolute top-[10%] left-[-20px] w-[20px] h-[4px] bg-white opacity-90" />
-                  <div className="absolute top-[10%] right-[-20px] w-[20px] h-[4px] bg-white opacity-90" />
+                  <div className="absolute top-[12%] w-full h-[5px] bg-white shadow-sm" />
+                  <div className="absolute top-[12%] left-[-20px] w-[20px] h-[5px] bg-white shadow-sm" />
+                  <div className="absolute top-[12%] right-[-20px] w-[20px] h-[5px] bg-white shadow-sm" />
+                  
+                  <div className="absolute bottom-[12%] w-full h-[5px] bg-white shadow-sm" />
+                  <div className="absolute bottom-[12%] left-[-20px] w-[20px] h-[5px] bg-white shadow-sm" />
+                  <div className="absolute bottom-[12%] right-[-20px] w-[20px] h-[5px] bg-white shadow-sm" />
+                  
+                  {/* Wide lines */}
+                  <div className="absolute bottom-[12%] left-[10px] w-[3px] h-[100px] bg-white/70" />
+                  <div className="absolute bottom-[12%] right-[10px] w-[3px] h-[100px] bg-white/70" />
+                  <div className="absolute top-[12%] left-[10px] w-[3px] h-[100px] bg-white/70" />
+                  <div className="absolute top-[12%] right-[10px] w-[3px] h-[100px] bg-white/70" />
 
-                  <div className="absolute bottom-[10%] w-full h-[4px] bg-white opacity-90" />
-                  <div className="absolute bottom-[10%] left-[-20px] w-[20px] h-[4px] bg-white opacity-90" />
-                  <div className="absolute bottom-[10%] right-[-20px] w-[20px] h-[4px] bg-white opacity-90" />
-
+                  
                   {/* Pitch dirt/wear patterns */}
-                  <div className="absolute inset-x-10 inset-y-[15%] bg-black/5 rounded-[100%] filter blur-md" />
+                  <div className="absolute inset-x-8 inset-y-[15%] bg-black/10 rounded-[100%] filter blur-xl" />
+
+                  {/* Pitch Aim Marker */}
+                  {(ballState === 'aiming' || ballState === 'run_up') && (
+                      <div 
+                          className="absolute w-8 h-8 -ml-4 -mt-4 border-[3px] border-cyan-400 rounded-full flex items-center justify-center bg-cyan-400/20 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-10 transition-transform"
+                          style={{ left: `${aimX}%`, top: `60%`, transform: ballState === 'aiming' ? 'scale(1.2)' : 'scale(1)' }}
+                      >
+                          <div className="w-1 h-1 bg-white rounded-full animate-ping" />
+                      </div>
+                  )}
+
               </div>
           </div>
       </div>
 
-      {/* HUD Scoreboard */}
-      <div className="absolute top-4 left-4 z-30 bg-slate-900/90 backdrop-blur border border-slate-700 p-3 rounded-2xl shadow-2xl flex items-center gap-4">
-          <div className="flex flex-col">
-              <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">{battingTeam.name}</span>
-              <div className="text-3xl font-black text-white leading-none">
-                  {inningScore}<span className="text-xl text-yellow-500">/{inningWickets}</span>
-              </div>
-          </div>
-          <div className="w-px h-8 bg-slate-700" />
-          <div className="flex flex-col">
-              <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">OVERS</span>
-              <div className="text-xl font-black text-white leading-none">
-                  {Math.floor((totalBalls - ballsLeft)/6)}.{ (totalBalls - ballsLeft)%6 }
-              </div>
-          </div>
-          {phase === 'inning2' && (
-              <>
-                  <div className="w-px h-8 bg-slate-700" />
-                  <div className="flex flex-col">
-                      <span className="text-white/60 text-[10px] font-black uppercase tracking-widest">TARGET</span>
-                      <div className="text-xl font-black text-cyan-400 leading-none">{targetScore}</div>
+            {/* HUD Scoreboard */}
+      <div className="absolute top-4 inset-x-4 flex justify-between items-start z-50 pointer-events-none">
+          {/* Batting Team Score */}
+          <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700/50 p-2 pr-4 md:p-3 md:pr-6 rounded-3xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] flex items-center gap-3 md:gap-4 relative overflow-hidden">
+              <div className={`absolute left-0 top-0 bottom-0 w-2 ${battingTeam.color}`} />
+              <div className="pl-2 flex flex-col">
+                  <span className="text-white/50 text-[10px] font-black uppercase tracking-widest">{battingTeam.name}</span>
+                  <div className="text-2xl md:text-4xl font-black text-white leading-none tracking-tighter">
+                      {inningScore}<span className="text-lg md:text-2xl text-yellow-500">/{inningWickets}</span>
                   </div>
-              </>
-          )}
-      </div>
-
-      {/* 2.5D Play Area Elements (Stumps, Batsman, Bowler, Ball) */}
-      <div className="absolute inset-0 z-20 pointer-events-none perspective-[800px]">
+              </div>
+              <div className="w-px h-10 bg-slate-700/50" />
+              <div className="flex flex-col">
+                  <span className="text-white/50 text-[10px] font-black uppercase tracking-widest">OVER</span>
+                  <div className="text-xl md:text-2xl font-black text-white leading-none">
+                      {Math.floor((totalBalls - ballsLeft)/6)}<span className="text-sm md:text-lg text-slate-400">.{(totalBalls - ballsLeft)%6}</span>
+                  </div>
+              </div>
+          </div>
           
-          {/* Fielders */}
-          {fielders.map(f => {
-              // f.y is 0 to 100 on tactical map. On 3D screen, 0% is near horizon (top), 100% is near user (bottom)
-              // But perspective makes them smaller at the top.
-              const isMoving = activeFielderAction?.id === f.id;
-              
-              const fieldY = isMoving ? activeFielderAction.destY : 20 + (f.y * 0.6); // 20% to 80% screen space
-              const currentX = isMoving ? activeFielderAction.destX : f.x;
-              
-              const tacticalYForDepth = isMoving ? (activeFielderAction.destY - 20) / 0.6 : f.y;
-              const depthScale = 0.3 + (tacticalYForDepth / 150); 
-              
-              // Give them moving arms if running
-              const armRotate = isMoving ? 'animate-[spin_0.3s_linear_infinite]' : 'rotate-12';
-              
-              return (
-                  <div 
-                      key={f.id}
-                      className={`absolute transition-all duration-700 ease-out z-10 flex flex-col items-center drop-shadow-xl ${isMoving ? 'scale-110' : ''}`}
-                      style={{ 
-                          left: `${currentX}%`, 
-                          top: `${fieldY}%`, 
-                          transform: `translate(-50%, -100%) scale(${depthScale})`,
-                          zIndex: Math.floor(tacticalYForDepth) // nearer fielders render on top
-                      }}
-                  >
-                      <div className={`w-6 h-6 ${bowlingTeam.skin} rounded-full border border-black/20 shadow-md z-20`} />
-                      <div className={`w-10 h-14 -mt-1 ${bowlingTeam.uniform} rounded-t-xl shadow-xl flex justify-center pt-2 relative z-10`}>
-                          {/* Arms */}
-                          <div className={`absolute -left-2 top-2 w-3 h-10 ${bowlingTeam.skin} rounded-full ${armRotate} origin-top`}>
-                              <div className={`absolute top-0 w-full h-4 ${bowlingTeam.uniform} rounded-t-full`} />
-                          </div>
-                          <div className={`absolute -right-2 top-2 w-3 h-10 ${bowlingTeam.skin} rounded-full ${armRotate} origin-top`} style={{ animationDelay: isMoving ? '0.15s' : '0s' }}>
-                              <div className={`absolute top-0 w-full h-4 ${bowlingTeam.uniform} rounded-t-full`} />
-                          </div>
-                      </div>
-                      <div className="flex gap-1 -mt-1 z-0">
-                          <div className={`w-4 h-10 ${bowlingTeam.pants} rounded-b-md border-b border-x border-black/10`} />
-                          <div className={`w-4 h-10 ${bowlingTeam.pants} rounded-b-md border-b border-x border-black/10`} />
-                      </div>
+          {/* Target / Bowler Info */}
+          <div className="flex flex-col items-end gap-2">
+              {phase === 'inning2' && (
+                  <div className="bg-gradient-to-r from-red-600 to-orange-500 text-white font-black px-6 py-2 rounded-full shadow-[0_5px_20px_rgba(239,68,68,0.5)] border border-orange-300 flex flex-col items-end transform origin-right animate-[pulse_2s_infinite]">
+                      <span className="uppercase text-[9px] tracking-widest text-orange-200">Target to Win</span>
+                      <span className="text-2xl tracking-tighter leading-none">{targetScore}</span>
                   </div>
-              )
-          })}
-
-          {/* Aim Marker (when bowling) */}
-          {!isUserBatting && ballState === 'aiming' && (
-              <div 
-                className="absolute top-[75%] w-10 h-5 -ml-5 rounded-[100%] border-4 border-cyan-400/80 bg-cyan-400/30 shadow-[0_0_25px_rgba(34,211,238,1)] z-20 transition-all"
-                style={{ left: `${aimX}%`, transform: 'rotateX(65deg)' }}
-              >
-                  <div className="absolute inset-0 border-2 border-white rounded-[100%] animate-ping opacity-50" />
+              )}
+              <div className="bg-slate-900/80 backdrop-blur border border-slate-700/50 px-4 py-2 rounded-2xl flex flex-col items-end">
+                  <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">Bowler</span>
+                  <span className="text-cyan-400 font-bold text-sm">{selectedBall.name}</span>
               </div>
-          )}
-
-          {/* Bowler's End Stumps (Top) */}
-          <div className="absolute top-[40%] left-1/2 -translate-x-1/2 flex gap-[2px] items-end h-6 z-10">
-                <div className="w-[4px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.3)]" />
-                <div className="w-[4px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.3)]" />
-                <div className="w-[4px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.3)]" />
           </div>
+      </div>
 
-          {/* Batting End Stumps (Bottom) */}
-          <div className="absolute bottom-[20%] left-1/2 -translate-x-1/2 flex gap-[3px] items-end h-8 z-10">
-                <div className={`w-[5px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.4)] transition-transform duration-500 origin-bottom ${isWicketHit && isUserBatting ? '-rotate-[60deg] -translate-x-8 translate-y-4 opacity-0' : ''}`} />
-                <div className={`w-[5px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.4)] transition-transform duration-500 origin-bottom ${isWicketHit && isUserBatting ? '-rotate-[20deg] translate-y-4 opacity-0' : ''}`} />
-                <div className={`w-[5px] h-full bg-yellow-500 rounded-t-sm shadow-[inset_-1px_0_3px_rgba(0,0,0,0.4)] transition-transform duration-500 origin-bottom ${isWicketHit && isUserBatting ? 'rotate-[70deg] translate-x-8 translate-y-4 opacity-0' : ''}`} />
+            
+      {/* 2.5D Avatars & Elements */}
+      
+      {/* Bowler Avatar (Top) */}
+      <div  className={`absolute top-[35%] left-[50%] transition-all duration-300 z-20 origin-bottom pointer-events-none ${ballState === 'run_up' ? 'translate-y-[100px] scale-[0.3]' : 'translate-y-0 scale-[0.15]'} md:${ballState === 'run_up' ? 'translate-y-[150px] scale-[0.4]' : 'translate-y-0 scale-[0.2]'}`} style={{ transform: `translateX(-50%)` }}>
+          <div className={`w-24 h-32 ${bowlingTeam.uniform} rounded-t-full rounded-b-3xl relative flex flex-col items-center justify-start pt-2 border-2 border-black/20 shadow-xl`}>
+              <div className="w-10 h-12 bg-amber-200 rounded-full absolute -top-10 border-2 border-black/10 overflow-hidden">
+                  <div className="w-full h-4 bg-slate-800 absolute top-0" />
+              </div>
           </div>
+      </div>
 
-          {/* Bowler Avatar (Top) */}
-          <div className={`absolute left-1/2 -translate-x-1/2 flex flex-col items-center transition-all ${ballState === 'run_up' || ballState === 'bowling' ? 'duration-[1200ms] ease-out' : 'duration-[200ms]'} ${ballState === 'run_up' || ballState === 'bowling' ? 'top-[36%] scale-[0.3]' : 'top-[28%] scale-[0.15]'}`}>
-               {/* Head/Hair */}
-               <div className={`w-12 h-12 ${bowlingTeam.skin} rounded-full border border-black/20 z-20 relative shadow-md transition-transform ${ballState === 'run_up' ? 'animate-bounce' : ''}`}>
-                   <div className="absolute top-0 inset-x-0 h-4 bg-black/80 rounded-t-full" /> {/* Hair */}
-                   <div className="absolute top-[40%] right-2 w-2 h-2 bg-black/60 rounded-full" /> {/* Eye */}
-               </div>
-               
-               {/* Torso & Arms */}
-               <div className="relative z-10 flex flex-col items-center -mt-1">
-                   <div className={`w-12 h-14 ${bowlingTeam.uniform} rounded-t-2xl shadow-xl flex justify-center pt-2 relative border border-white/10`}>
-                        <div className="w-3 h-full bg-black/10 absolute left-1" /> {/* shading */}
-                   </div>
-                   
-                   {/* Bowling Arm (animate when bowling) */}
-                   <div className={`absolute -right-3 top-2 w-4 h-14 ${bowlingTeam.skin} rounded-full origin-top transition-transform duration-[400ms] ease-in ${ballState === 'bowling' ? '-rotate-[200deg]' : ballState === 'run_up' ? 'rotate-[40deg]' : 'rotate-[20deg]'}`}>
-                       {/* Sleeve */}
-                       <div className={`absolute top-0 w-full h-5 ${bowlingTeam.uniform} rounded-t-full`} />
-                       {/* Hand / Ball */}
-                       {ballState === 'idle' || ballState === 'aiming' || ballState === 'run_up' ? (
-                           <div className="absolute -bottom-2 -left-1 w-5 h-5 rounded-full shadow-md" style={{ backgroundColor: selectedBall.color }} />
-                       ) : null}
-                   </div>
-                   {/* Other Arm */}
-                   <div className={`absolute -left-3 top-2 w-4 h-12 ${bowlingTeam.skin} rounded-full origin-top ${ballState === 'run_up' ? 'animate-pulse -rotate-[40deg]' : 'rotate-[-20deg]'}`}>
-                       <div className={`absolute top-0 w-full h-5 ${bowlingTeam.uniform} rounded-t-full`} />
-                   </div>
-               </div>
-
-               {/* Legs */}
-               <div className="flex gap-[3px] -mt-1 z-0">
-                  <div className={`w-5 h-12 ${bowlingTeam.pants} border-x border-b border-black/20 rounded-b-md shadow-inner relative transition-transform ${ballState === 'run_up' ? 'animate-pulse translate-y-[-2px]' : ''}`}>
-                      <div className="absolute -bottom-1.5 left-0 w-5 h-2 bg-white rounded-t-sm border border-slate-300" /> {/* Shoe */}
-                  </div>
-                  <div className={`w-5 h-12 ${bowlingTeam.pants} border-x border-b border-black/20 rounded-b-md shadow-inner relative transition-transform ${ballState === 'run_up' ? 'animate-pulse translate-y-[2px]' : ''}`}>
-                      <div className="absolute -bottom-1.5 left-0 w-5 h-2 bg-white rounded-t-sm border border-slate-300" /> {/* Shoe */}
-                  </div>
-               </div>
-          </div>
-
-          {/* Batsman Avatar (Bottom) */}
-          <div className={`absolute bottom-[23%] left-[42%] transition-transform duration-150 z-30 origin-bottom`} style={{ transform: `translateX(-50%) ${batSwing && isUserBatting ? 'translateX(-30px)' : 'translateX(0)'} scale(0.35)` }}>
-              <div className="relative flex flex-col items-center">
-                  {/* Head & Helmet */}
-                  <div className="relative w-14 h-16 z-30 flex flex-col items-center transition-transform duration-150" style={{ transform: batSwing ? 'rotate(-10deg) translate(-5px, 2px)' : 'rotate(15deg) translate(5px, 0)' }}>
-                      <div className={`w-14 h-14 ${battingTeam.helmet} rounded-t-3xl rounded-b-xl border-4 border-black/40 relative shadow-[0_15px_30px_rgba(0,0,0,0.6)]`}>
-                          <div className="absolute top-1/2 inset-x-1.5 h-5 border-[4px] border-slate-300 rounded-lg flex flex-col justify-between p-[1px]">
-                              <div className="w-full h-[2px] bg-slate-300" />
-                          </div> {/* Grill */}
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-5 h-1.5 bg-black/20 rounded-full" /> {/* Visor detail */}
-                      </div>
-                      <div className={`absolute bottom-0 w-7 h-4 ${battingTeam.skin} rounded-b-md z-[-1] border-x border-b border-black/20`} /> {/* Neck/face */}
-                  </div>
-                  
-                  {/* Torso */}
-                  <div className={`w-20 h-24 -mt-2 ${battingTeam.uniform} rounded-t-[2rem] z-20 shadow-2xl border-x border-t border-white/10 flex justify-center pt-4 relative`}>
-                      <span className="text-white/60 font-black text-3xl">10</span>
-                      {/* Left Arm (Front) */}
-                      <div className={`absolute -left-5 top-2 w-7 h-20 ${battingTeam.skin} rounded-full origin-top transition-transform duration-150 ${batSwing ? '-rotate-[110deg] -translate-y-4 -translate-x-6' : 'rotate-[35deg]'}`}>
-                          <div className={`absolute top-0 w-full h-8 ${battingTeam.uniform} rounded-t-full shadow-inner`} />
-                          {/* Glove */}
-                          <div className="absolute -bottom-2 -left-1 w-8 h-8 bg-white border border-slate-300 rounded-xl" />
-                      </div>
-                  </div>
-                  
-                  {/* Right Arm (Back) */}
-                  <div className={`absolute -right-2 top-[3.5rem] w-7 h-20 ${battingTeam.skin} rounded-full z-10 origin-top transition-transform duration-150 ${batSwing ? '-rotate-[130deg] -translate-x-5 -translate-y-6' : 'rotate-[15deg]'}`}>
-                      <div className={`absolute top-0 w-full h-8 ${battingTeam.uniform} rounded-t-full shadow-inner`} />
-                      {/* Glove */}
-                      <div className="absolute -bottom-2 -left-1 w-8 h-8 bg-white border border-slate-300 rounded-xl shadow-md" />
-                  </div>
-
-                  {/* Legs with Pads */}
-                  <div className="flex gap-3 -mt-2 z-10 transition-transform duration-150" style={{ transform: batSwing ? 'translate(10px, 0)' : 'translate(0, 0)' }}>
-                      <div className={`w-7 h-24 ${battingTeam.pants} rounded-t-md rounded-b-xl border border-black/10 flex flex-col items-center relative`}>
-                          <div className="absolute -bottom-2 w-8 h-4 bg-white rounded-t-md border border-slate-300" /> {/* Shoe */}
-                          <div className="absolute top-1 w-8 h-[5.5rem] bg-white rounded-t-md rounded-b-xl border-2 border-slate-200 shadow-[inset_-3px_0_6px_rgba(0,0,0,0.2)] flex flex-col justify-around py-2 px-1 z-10">
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                          </div> {/* Pad */}
-                      </div>
-                      <div className={`w-7 h-24 ${battingTeam.pants} rounded-t-md rounded-b-xl border border-black/10 flex flex-col items-center relative`}>
-                          <div className="absolute -bottom-2 w-8 h-4 bg-white rounded-t-md border border-slate-300" /> {/* Shoe */}
-                          <div className="absolute top-1 w-8 h-[5.5rem] bg-white rounded-t-md rounded-b-xl border-2 border-slate-200 shadow-[inset_-3px_0_6px_rgba(0,0,0,0.2)] flex flex-col justify-around py-2 px-1 z-10">
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                              <div className="w-full h-1.5 bg-slate-200 rounded-full" />
-                          </div> {/* Pad */}
-                      </div>
-                  </div>
-
-                  {/* Bat Component */}
-                  <div className={`absolute left-0 top-[5.5rem] origin-[top_center] transition-transform duration-150 z-40 ${batSwing ? '-rotate-[130deg] -translate-x-12 -translate-y-8' : 'rotate-[25deg] translate-x-4 translate-y-2'}`}>
-                      {/* Handle */}
-                      <div className="w-4 h-16 bg-slate-800 rounded-t-md mx-auto relative shadow-inner">
-                          <div className="absolute top-2 w-full h-1 bg-slate-900" />
-                          <div className="absolute top-6 w-full h-1 bg-slate-900" />
-                          <div className="absolute top-10 w-full h-1 bg-slate-900" />
-                      </div>
-                      {/* Blade */}
-                      <div className={`w-9 h-44 ${selectedBat.color} rounded-b-xl shadow-[0_15px_40px_rgba(0,0,0,0.7)] border border-black/30 overflow-hidden relative -ml-[2px]`}>
-                          <div className="absolute inset-x-0 bottom-4 h-12 bg-black/20" /> {/* Grip wrap */}
-                          <div className="absolute left-[4px] top-0 bottom-0 w-[2px] bg-white/30" />
-                          <div className="absolute left-[10px] top-0 bottom-0 w-[1px] bg-black/20" />
-                      </div>
+      {/* Batsman Avatar (Bottom) */}
+      <div className={`absolute bottom-[23%] left-[50%] transition-transform duration-150 z-30 origin-bottom pointer-events-none scale-[0.35] md:scale-[0.45]`} style={{ transform: `translateX(-50%) ${batSwing ? (isUserBatting ? 'translateX(-30px)' : 'translateX(30px)') : 'translateX(0)'}` }}>
+          <div className={`w-32 h-44 ${battingTeam.uniform} rounded-t-full rounded-b-3xl relative flex flex-col items-center justify-start pt-6 border-2 border-black/20 shadow-2xl`}>
+              <div className="w-16 h-18 bg-blue-900 rounded-t-3xl rounded-b-xl absolute -top-16 border-2 border-black/20 flex flex-col items-center pt-2">
+                  <div className="w-14 h-8 border-4 border-slate-300 rounded-lg mt-2" />
+              </div>
+              <div className={`absolute top-10 ${batSwing ? '-left-20 -rotate-[120deg] origin-top-right' : '-right-10 rotate-12'} transition-all duration-150 ease-out`}>
+                  <div className={`w-8 h-40 ${selectedBat.color} rounded-b-xl shadow-xl border border-black/30 relative`}>
+                      <div className="absolute top-0 inset-x-0 h-12 bg-black/40 rounded-t-sm" />
                   </div>
               </div>
           </div>
       </div>
 
-      {/* Ball Element - Rendered on top of 2.5D but manually positioned */}
+      {/* Ball Element */}
       <div 
-          className={`absolute w-3 h-3 md:w-4 md:h-4 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.6)] z-40 pointer-events-none transition-all ${ballState === 'bowling' ? 'duration-[1200ms] ease-linear' : ballState === 'hit' ? 'duration-[400ms] ease-out' : 'duration-[0ms]'} ${ballState === 'run_up' || ballState === 'idle' ? 'opacity-0' : 'opacity-100'}`}
+          className={`absolute w-4 h-4 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.6)] z-40 pointer-events-none transition-all ${ballState === 'bowling' ? 'duration-[1200ms] ease-linear' : ballState === 'hit' ? 'duration-[400ms] ease-out' : 'duration-[0ms]'} ${ballState === 'run_up' || ballState === 'idle' ? 'opacity-0' : 'opacity-100'}`}
           style={{ 
-            left: `calc(${ballX}% - 6px)`, 
+            left: `calc(${ballX}% - 8px)`, 
             top: `${ballY}%`,
             transform: `scale(${ballScale})`,
             backgroundColor: selectedBall.color,
             boxShadow: `inset -2px -2px 5px rgba(0,0,0,0.5), inset 2px 2px 5px rgba(255,255,255,0.4)`
           }}
       >
-          {/* Seam */}
           <div className={`absolute inset-0 border-[1px] border-white/50 rounded-full ${ballState === 'bowling' ? 'animate-[spin_0.2s_linear_infinite]' : ''}`} />
       </div>
 
       {/* Umpire Message */}
       {umpireMsg && (
-        <div className="absolute top-[35%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 text-center pointer-events-none w-full flex flex-col items-center">
+        <div className="absolute top-[40%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 text-center pointer-events-none w-full flex flex-col items-center">
             {umpireMsg !== 'SET PITCH LINE' && (
-                <div className="text-[10px] md:text-sm font-black uppercase text-white bg-slate-900/90 border border-slate-700 shadow-2xl px-6 py-2 rounded-full mb-4 flex items-center gap-2 drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                    <User className="w-4 h-4 text-emerald-400" /> Umpire Decision
+                <div className="text-sm font-black uppercase text-white bg-slate-900/95 border-b-4 border-slate-700 shadow-2xl px-6 py-2 rounded-t-2xl mb-0 flex flex-col items-center gap-1">
+                    <span className="text-4xl drop-shadow-lg">
+                      {umpireMsg.includes('OUT') || umpireMsg.includes('BOWLED') || umpireMsg.includes('CAUGHT') ? '👲☝️' : umpireMsg.includes('SIX') ? '👲🙌' : umpireMsg.includes('FOUR') ? '👲🫱' : '👲👀'}
+                    </span>
+                    <span className="text-slate-400">UMPIRE</span>
                 </div>
             )}
-            <div className={`text-5xl md:text-7xl font-black uppercase tracking-tighter drop-shadow-[0_15px_30px_rgba(0,0,0,0.8)] italic stroke-black ${umpireMsg.includes('OUT') || umpireMsg.includes('BOWLED') || umpireMsg.includes('CAUGHT') || umpireMsg.includes('MISSED') ? 'text-red-500' : umpireMsg === 'SET PITCH LINE' ? 'text-cyan-400' : 'text-yellow-400 scale-110'}`} style={{ WebkitTextStroke: '2px #1e293b' }}>
+            <div className={`text-5xl md:text-7xl font-black uppercase tracking-tighter drop-shadow-[0_15px_30px_rgba(0,0,0,0.8)] italic px-8 py-2 rounded-xl ${umpireMsg.includes('OUT') || umpireMsg.includes('BOWLED') || umpireMsg.includes('CAUGHT') ? 'text-red-500 bg-red-950/80 border-2 border-red-500' : umpireMsg === 'SET PITCH LINE' ? 'text-cyan-400' : 'text-yellow-400 bg-yellow-950/80 border-2 border-yellow-500 scale-110'}`}>
                 {umpireMsg}
             </div>
         </div>
       )}
 
       {/* Controls */}
-      <div className="absolute bottom-0 inset-x-0 p-4 md:p-8 pb-safe z-50 flex justify-center">
+      <div className="absolute bottom-0 inset-x-0 p-4 md:p-8 pb-safe z-50 flex justify-center pointer-events-none">
           {isUserBatting ? (
-              <div className="w-full max-w-sm flex flex-col gap-4">
+              <div className="w-full max-w-sm flex flex-col gap-4 pointer-events-auto">
                   {ballState === 'idle' && !umpireMsg && (
                       <button 
                         onPointerDown={(e) => { e.stopPropagation(); userBat_bowlNextBall(); }}
-                        className="w-full py-5 md:py-6 bg-gradient-to-b from-cyan-400 to-cyan-600 border border-cyan-300 text-white font-black rounded-full shadow-[0_10px_40px_rgba(6,182,212,0.6)] text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all cursor-pointer pointer-events-auto"
+                        className="w-full py-4 md:py-6 bg-gradient-to-b from-cyan-400 to-cyan-600 border border-cyan-300 text-white font-black rounded-full shadow-[0_10px_40px_rgba(6,182,212,0.6)] text-xl md:text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
                       >READY FOR BOWL</button>
                   )}
                   {ballState === 'run_up' && (
@@ -1024,80 +1113,66 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
                       </div>
                   )}
                   {ballState === 'bowling' && (
-                      <div className="flex gap-4 w-full pointer-events-auto">
+                      <div className="flex gap-4 w-full">
                           <button 
                             onPointerDown={(e) => { e.stopPropagation(); userBat_handleSwing(false, 'ground'); }}
-                            className="flex-1 py-10 md:py-12 bg-gradient-to-b from-blue-500 to-blue-700 border-2 border-blue-300 backdrop-blur text-white font-black rounded-full shadow-[0_10px_50px_rgba(59,130,246,0.8)] text-2xl md:text-3xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            className="flex-1 py-8 md:py-12 bg-gradient-to-b from-blue-500 to-blue-700 border-2 border-blue-300 backdrop-blur text-white font-black rounded-full shadow-[0_10px_50px_rgba(59,130,246,0.8)] text-lg md:text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
                           >GROUND</button>
                           <button 
                             onPointerDown={(e) => { e.stopPropagation(); userBat_handleSwing(false, 'loft'); }}
-                            className="flex-1 py-10 md:py-12 bg-gradient-to-b from-pink-500 to-pink-700 border-2 border-pink-300 backdrop-blur text-white font-black rounded-full shadow-[0_10px_50px_rgba(236,72,153,0.8)] text-2xl md:text-3xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all animate-pulse cursor-pointer"
+                            className="flex-1 py-8 md:py-12 bg-gradient-to-b from-pink-500 to-pink-700 border-2 border-pink-300 backdrop-blur text-white font-black rounded-full shadow-[0_10px_50px_rgba(236,72,153,0.8)] text-lg md:text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all animate-pulse"
                           >LOFT</button>
                       </div>
                   )}
               </div>
           ) : (
-              <div className="w-full max-w-sm flex flex-col gap-4">
+              <div className="w-full max-w-sm flex flex-col gap-4 pointer-events-auto">
                   {ballState === 'idle' && !umpireMsg && (
-                      <div className="flex flex-col gap-3 pointer-events-auto">
+                      <div className="flex flex-col gap-3">
                           <button 
                             onPointerDown={(e) => { e.stopPropagation(); userBowl_startAiming(); }}
-                            className="w-full py-5 md:py-6 bg-gradient-to-b from-emerald-400 to-emerald-600 border border-emerald-300 text-white font-black rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.6)] text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                            className="w-full py-4 md:py-6 bg-gradient-to-b from-emerald-400 to-emerald-600 border border-emerald-300 text-white font-black rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.6)] text-xl md:text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
                           >START AIMING</button>
-                          
-                          <div className="flex gap-2">
+                          <div className="flex justify-center">
                               <button 
                                 onClick={(e) => { e.stopPropagation(); setShowFieldMap(true); }}
-                                className="flex-1 py-3 bg-slate-800 border border-slate-600 text-cyan-400 font-black rounded-xl text-sm uppercase tracking-widest hover:bg-slate-700 transition-colors"
+                                className="px-6 py-3 bg-slate-800 border border-slate-600 text-cyan-400 font-black rounded-xl text-sm uppercase tracking-widest hover:bg-slate-700 transition-colors"
                               >
-                                  <MapPin className="w-4 h-4 inline mr-1" /> Field
+                                  Adjust Field
                               </button>
-                              
-                              <div className="flex-1 flex overflow-hidden rounded-xl border border-slate-600 bg-slate-800">
-                                  {BALLS.slice(1, 3).map(b => (
-                                      <button
-                                        key={b.id}
-                                        onClick={(e) => { e.stopPropagation(); setSelectedBall(b); }}
-                                        className={`flex-1 py-3 font-bold text-[10px] uppercase transition-colors ${selectedBall.id === b.id ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:bg-slate-700'}`}
-                                      >
-                                        {b.name.split(' ')[1]}
-                                      </button>
-                                  ))}
-                              </div>
                           </div>
                       </div>
                   )}
                   {ballState === 'aiming' && (
                       <button 
                         onPointerDown={(e) => { e.stopPropagation(); userBowl_lockAim(); }}
-                        className="w-full py-10 md:py-12 bg-gradient-to-b from-cyan-500 to-cyan-700 border-2 border-cyan-300 backdrop-blur text-white font-black rounded-full shadow-[0_10px_50px_rgba(6,182,212,0.8)] text-3xl md:text-4xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all animate-pulse cursor-pointer pointer-events-auto"
-                      >LOCK BOWL</button>
+                        className="w-full py-4 md:py-6 bg-gradient-to-b from-yellow-400 to-yellow-600 border border-yellow-300 text-yellow-950 font-black rounded-full shadow-[0_10px_40px_rgba(234,179,8,0.6)] text-xl md:text-2xl uppercase tracking-widest hover:scale-105 active:scale-95 transition-all animate-pulse"
+                      >LOCK AIM</button>
                   )}
               </div>
           )}
       </div>
-      
-      {/* Field Map Overlay */}
+
+{/* Field Map Overlay */}
       {showFieldMap && (
-          <div className="absolute inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center p-4 touch-none">
-              <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-6">Tactical Field Setup</h2>
-              <div 
-                  className="w-full max-w-[300px] aspect-[4/5] bg-emerald-700 rounded-[120px] border-4 border-white/20 relative overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]"
+          <div className="absolute inset-0 bg-slate-900/95 z-[100] flex flex-col items-center justify-center p-4">
+              <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-6">Field Formation</h2>
+              
+              <div className="relative w-full max-w-sm aspect-[4/5] bg-green-800 rounded-[100px] border-4 border-green-600 shadow-inner overflow-hidden"
                   onPointerMove={(e) => {
-                      if (draggedFielder !== null) {
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          const x = ((e.clientX - rect.left) / rect.width) * 100;
-                          const y = ((e.clientY - rect.top) / rect.height) * 100;
-                          setFielders(prev => prev.map(f => f.id === draggedFielder ? { ...f, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } : f));
-                      }
+                      if (draggedFielder === null) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+                      const y = Math.max(0, Math.min(100, ((e.clientY - rect.top) / rect.height) * 100));
+                      setFielders(prev => prev.map(f => f.id === draggedFielder ? { ...f, x, y } : f));
                   }}
                   onPointerUp={() => setDraggedFielder(null)}
                   onPointerLeave={() => setDraggedFielder(null)}
               >
-                  {/* Pitch */}
-                  <div className="absolute top-[35%] left-1/2 -translate-x-1/2 w-8 h-24 bg-[#d9b382] border border-white/30" />
+                  {/* Pitch Area */}
+                  <div className="absolute top-[40%] bottom-[40%] left-[45%] right-[45%] bg-[#E8DCC4] rounded-sm" />
                   
-                  {/* Inner Circle */}
+                  {/* 30 Yard Circle (Approximate) */}
                   <div className="absolute top-[25%] left-[15%] right-[15%] bottom-[25%] rounded-[100px] border-2 border-dashed border-white/30 pointer-events-none" />
 
                   {/* Fielders */}
@@ -1135,7 +1210,7 @@ export const CricketLeague = ({ onExit }: { onExit: () => void }) => {
                             setShowBowlerSelect(false);
                             toast({ title: 'Bowler Selected', message: `You chose ${b.name}` });
                         }}
-                        className={`px-8 py-6 rounded-2xl font-black uppercase text-xl transition-all border-4 ${selectedBall.id === b.id ? 'bg-cyan-500 text-white border-cyan-300 scale-110 shadow-[0_0_30px_rgba(6,182,212,0.6)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:scale-105 hover:bg-slate-700'}`}
+                        className={`px-6 py-4 md:px-8 md:py-6 rounded-2xl font-black uppercase text-lg md:text-xl transition-all border-4 ${selectedBall.id === b.id ? 'bg-cyan-500 text-white border-cyan-300 scale-110 shadow-[0_0_30px_rgba(6,182,212,0.6)]' : 'bg-slate-800 text-slate-400 border-slate-700 hover:scale-105 hover:bg-slate-700'}`}
                       >
                         {b.name.split(' ')[1]}
                       </button>

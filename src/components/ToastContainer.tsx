@@ -25,6 +25,8 @@ export function ToastContainer() {
     }
   };
 
+  if (toasts.length === 0) return null;
+
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-full max-w-sm px-4 pointer-events-none">
       <AnimatePresence>
@@ -34,7 +36,13 @@ export function ToastContainer() {
             initial={{ opacity: 0, y: -20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9, y: -20 }}
-            className="bg-slate-900 border border-slate-700/50 rounded-2xl p-4 shadow-2xl shadow-black/50 pointer-events-auto flex gap-3 items-start backdrop-blur-md"
+            className={`bg-slate-900 border border-slate-700/50 rounded-2xl p-4 shadow-2xl shadow-black/50 pointer-events-auto flex gap-3 items-start backdrop-blur-md ${t.onClick ? 'cursor-pointer hover:bg-slate-800 transition-colors' : ''}`}
+            onClick={() => {
+              if (t.onClick) {
+                t.onClick();
+                setToasts(prev => prev.filter(x => x.id !== t.id));
+              }
+            }}
           >
             <div className="bg-slate-800 p-2 rounded-xl shrink-0">
               {getIcon(t.icon)}
@@ -42,6 +50,18 @@ export function ToastContainer() {
             <div className="flex-1">
               <h4 className="text-sm font-bold text-white tracking-tight">{t.title}</h4>
               <p className="text-xs text-slate-400 mt-0.5 font-medium">{t.message}</p>
+              {t.actionText && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    t.onAction?.();
+                    setToasts(prev => prev.filter(x => x.id !== t.id));
+                  }}
+                  className="mt-2 px-3 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  {t.actionText}
+                </button>
+              )}
             </div>
             <button 
               onClick={() => setToasts(prev => prev.filter(x => x.id !== t.id))}

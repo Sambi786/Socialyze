@@ -5,6 +5,9 @@ export type ToastType = {
   title: string;
   message: string;
   icon?: 'flame' | 'gift' | 'bell';
+  onClick?: () => void;
+  actionText?: string;
+  onAction?: () => void;
 };
 
 type Listener = (toast: ToastType) => void;

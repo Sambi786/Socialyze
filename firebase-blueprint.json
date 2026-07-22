@@ -1,0 +1,37 @@
+{
+  "users": {
+    "$uid": {
+      "username": "string",
+      "avatar": "string",
+      "streaks": "number",
+      "birthDate": "string",
+      "email": "string",
+      "gender": "string",
+      "friends": "array"
+    }
+  },
+  "groups": {
+    "$groupId": {
+      "name": "string",
+      "avatar": "string",
+      "adminId": "string",
+      "members": "array",
+      "joinRequests": "array"
+    }
+  },
+  "messages": {
+    "$chatId": {
+      "participants": "array",
+      "groupId": "string",
+      "messages": "array"
+    }
+  },
+  "stories": {
+    "$storyId": {
+      "userId": "string",
+      "type": "string",
+      "url": "string",
+      "timestamp": "number"
+    }
+  }
+}

@@ -10,7 +10,7 @@ interface CreatePostModalProps {
 }
 
 export function CreatePostModal({ isOpen, onClose, prefillTagged }: CreatePostModalProps) {
-  const { user, friends, createPost } = useAppContext();
+  const { user, friends, createPost, completeMission } = useAppContext();
   const [description, setDescription] = useState("");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
@@ -70,6 +70,7 @@ export function CreatePostModal({ isOpen, onClose, prefillTagged }: CreatePostMo
         comments: 0,
         description: taggedFriend ? `${description} (with @${taggedFriend})` : description
       });
+      completeMission('create_post', 30);
     }
 
     toast({
@@ -86,7 +87,7 @@ export function CreatePostModal({ isOpen, onClose, prefillTagged }: CreatePostMo
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
       <div 
-        className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80vh] sm:h-auto"
+        className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl flex flex-col h-[80dvh] sm:h-auto sm:max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0 bg-slate-900/50">

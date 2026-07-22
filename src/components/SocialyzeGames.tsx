@@ -10,72 +10,187 @@ import { Logo } from './Logo';
 const SoccerGame = () => {
   const { user, updateUser } = useAppContext();
   const [score, setScore] = useState(0);
-  const [message, setMessage] = useState('');
-  const [ballState, setBallState] = useState<'idle' | 'kicked'>('idle');
-  const [ballPos, setBallPos] = useState({ x: 50, y: 80, scale: 1 });
-  const [targetPos, setTargetPos] = useState({ x: 50, y: 20 });
+  const [gameState, setGameState] = useState<'start' | 'playing' | 'gameover'>('start');
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [zlatanX, setZlatanX] = useState(50);
+  const [obstacles, setObstacles] = useState<{id: number, type: 'card' | 'haaland', x: number, passed: boolean, defeated: boolean}[]>([]);
   
-  useEffect(() => {
-    let interval: any;
-    if (ballState === 'idle') {
-      interval = setInterval(() => {
-        setTargetPos(prev => {
-          const newPos = prev.x + (Math.random() > 0.5 ? 20 : -20);
-          return { ...prev, x: Math.max(15, Math.min(85, newPos)) };
-        });
-      }, 700);
-    }
-    return () => clearInterval(interval);
-  }, [ballState]);
+  const [zlatanY, setZlatanY] = useState(0);
+  const [isAttacking, setIsAttacking] = useState(false);
 
-  const handleShoot = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (ballState === 'kicked') return;
-    
-    // Check if clicked the share button - avoid shooting
-    if ((e.target as HTMLElement).closest('.share-button')) return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * 100;
-    
-    setZlatanX(clickX);
-    setBallPos({ x: clickX, y: targetPos.y, scale: 0.5 });
-    setBallState('kicked');
+  const jumpingRef = useRef(false);
+  const attackingRef = useRef(false);
+  const obstaclesRef = useRef<any[]>([]);
+  const gameSpeedRef = useRef(1.0);
+  const spawnTimerRef = useRef(0);
+  const scoreRef = useRef(0);
+
+  const startGame = () => {
+    setScore(0);
+    scoreRef.current = 0;
+    setGameState('playing');
+    setObstacles([]);
+    obstaclesRef.current = [];
+    gameSpeedRef.current = 1.0;
+    spawnTimerRef.current = 1000;
+    jumpingRef.current = false;
+    attackingRef.current = false;
+    setZlatanY(0);
+    setIsAttacking(false);
+  };
+
+  const handleJump = () => {
+    if (gameState !== 'playing' || jumpingRef.current) return;
+    jumpingRef.current = true;
     playArcadeSound('shoot');
-
+    setZlatanY(120); 
     setTimeout(() => {
-      if (Math.abs(clickX - targetPos.x) < 15) {
-        setMessage('ZLATAN SCORES!!!');
-        setScore(s => {
-          const newScore = s + 1;
-          if (newScore === 5 && user && !user.achievements?.includes('Zlatan Mode')) {
-            updateUser({ achievements: [...(user.achievements || []), 'Zlatan Mode'] });
-            toast({ title: "Achievement Unlocked!", message: "Zlatan Mode activated!", icon: "gift" });
-          }
-          return newScore;
+      setZlatanY(0);
+      setTimeout(() => {
+        jumpingRef.current = false;
+      }, 100); 
+    }, 500); 
+  };
+
+  const handleAttack = () => {
+    if (gameState !== 'playing' || attackingRef.current) return;
+    attackingRef.current = true;
+    setIsAttacking(true);
+    playArcadeSound('shoot');
+    setTimeout(() => {
+      attackingRef.current = false;
+      setIsAttacking(false);
+    }, 400);
+  };
+
+  useEffect(() => {
+    let animationId: number;
+    let lastTime: number | null = null;
+
+    const loop = (time: number) => {
+      if (gameState !== 'playing') return;
+      if (lastTime === null) lastTime = time;
+      const deltaTime = time - lastTime;
+      const timeScale = deltaTime / 16.66;
+      lastTime = time;
+
+      let currentObstacles = [...obstaclesRef.current];
+      let isGameOver = false;
+
+      spawnTimerRef.current -= deltaTime;
+      if (spawnTimerRef.current <= 0) {
+        currentObstacles.push({
+          id: Date.now() + Math.random(),
+          type: Math.random() > 0.5 ? 'card' : 'haaland',
+          x: 120, // percentage 
+          passed: false,
+          defeated: false
         });
-        playArcadeSound('goal');
-      } else {
-        setMessage('Zlatan never misses, you missed!');
-        playArcadeSound('out');
+        spawnTimerRef.current = 1000 + Math.random() * 1500 * (1 / gameSpeedRef.current);
+        gameSpeedRef.current += 0.02;
       }
 
-      setTimeout(() => {
-        setBallState('idle');
-        setBallPos({ x: 50, y: 80, scale: 1 });
-        setZlatanX(50);
-        setMessage('');
-      }, 1500);
-    }, 500);
+      const ZLATAN_X = 20; 
+      const ZLATAN_WIDTH = 15; 
+
+      currentObstacles.forEach(obs => {
+        obs.x -= (gameSpeedRef.current * 0.5) * timeScale; // Move left
+
+        const inHitbox = obs.x < ZLATAN_X + ZLATAN_WIDTH && obs.x > ZLATAN_X - 5;
+
+        if (inHitbox && !obs.passed && !obs.defeated) {
+          if (obs.type === 'card') {
+            if (!jumpingRef.current) {
+               isGameOver = true;
+            }
+          } else if (obs.type === 'haaland') {
+            if (attackingRef.current && !jumpingRef.current) {
+               obs.defeated = true;
+               playArcadeSound('goal');
+               setScore(s => s + 10);
+            } else {
+               isGameOver = true;
+            }
+          }
+        }
+
+        if (obs.x < ZLATAN_X - 5 && !obs.passed && !obs.defeated) {
+           obs.passed = true;
+           setScore(s => s + 5);
+        }
+      });
+
+      if (isGameOver) {
+         playArcadeSound('out');
+         setGameState('gameover');
+         // update achievements
+         if (scoreRef.current >= 100 && user && !user.achievements?.includes('Zlatan Rampage')) {
+            updateUser({ achievements: [...(user.achievements || []), 'Zlatan Rampage'] });
+            toast({ title: "Achievement Unlocked!", message: "Zlatan Rampage Master!", icon: "gift" });
+         }
+         return;
+      }
+
+      currentObstacles = currentObstacles.filter(obs => obs.x > -20);
+      obstaclesRef.current = currentObstacles;
+      setObstacles(currentObstacles);
+      scoreRef.current = score;
+
+      animationId = requestAnimationFrame(loop);
+    };
+
+    if (gameState === 'playing') {
+      animationId = requestAnimationFrame(loop);
+    }
+    return () => cancelAnimationFrame(animationId);
+  }, [gameState, user, updateUser]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+         e.preventDefault();
+         if (gameState === 'start' || gameState === 'gameover') startGame();
+         else handleJump();
+      }
+      if (e.code === 'ArrowRight' || e.key === 'x') {
+         e.preventDefault();
+         handleAttack();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState]);
+
+  const handleTouch = (e: React.TouchEvent | React.MouseEvent) => {
+     if (gameState === 'start' || gameState === 'gameover') {
+        startGame();
+        return;
+     }
+     if ((e.target as HTMLElement).closest('.share-button')) return;
+     const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+     const screenWidth = window.innerWidth;
+     if (clientX < screenWidth / 2) {
+        handleJump();
+     } else {
+        handleAttack();
+     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-slate-950 p-4 relative overflow-hidden touch-none select-none" onClick={handleShoot}>
-      <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/40 to-transparent pointer-events-none" />
+    <div className="flex flex-col items-center justify-center h-full w-full bg-blue-400 p-4 relative overflow-hidden touch-none select-none" onPointerDown={handleTouch}>
+      {/* Sky/Background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-400 to-sky-200 pointer-events-none" />
+      
+      {/* Moving Ground */}
+      <div className="absolute bottom-0 inset-x-0 h-[30%] bg-emerald-600 border-t-8 border-emerald-800 flex" />
+      <div className={`absolute bottom-0 inset-x-0 h-[30%] flex ${gameState === 'playing' ? 'animate-[slide_1s_linear_infinite]' : ''}`} style={{ width: '200%' }}>
+         {Array.from({ length: 40 }).map((_, i) => (
+           <div key={i} className={`h-full w-10 ${i % 2 === 0 ? 'bg-emerald-500/30' : 'bg-transparent'}`} />
+         ))}
+      </div>
+
       <div className="text-white font-black text-2xl mb-4 absolute top-4 left-4 z-10 flex items-center gap-4">
-        <span className="flex items-center gap-2 tracking-tighter shadow-sm"><Trophy className="w-6 h-6 text-yellow-400" /> {score}</span>
-        {score > 0 && (
+        <span className="flex items-center gap-2 tracking-tighter shadow-sm text-slate-800"><Trophy className="w-6 h-6 text-yellow-400" /> {score}</span>
+        {score > 0 && gameState === 'gameover' && (
           <button 
             onClick={(e) => { e.stopPropagation(); setIsShareModalOpen(true); }}
             className="share-button flex items-center gap-1 text-[10px] font-bold tracking-widest uppercase bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-full text-white transition-colors"
@@ -88,55 +203,69 @@ const SoccerGame = () => {
       <ShareModal 
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        title={`I scored ${score} hits as Zlatan!`}
+        title={`I scored ${score} in Zlatan Rampage!`}
         url="https://socialyze.app/games/zlatan-rampage"
       />
-      
-      {/* Target */}
-      <div 
-        className="absolute w-16 h-16 bg-red-500 rounded-full border-4 border-white transition-all duration-500 z-0 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.6)]"
-        style={{ left: `calc(${targetPos.x}% - 2rem)`, top: `${targetPos.y}%` }}
-      >
-        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center">
-          <div className="w-4 h-4 bg-red-500 rounded-full" />
+
+      {/* Start / Game Over Screen */}
+      {(gameState === 'start' || gameState === 'gameover') && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-black/40 backdrop-blur-sm">
+           <h2 className="text-4xl md:text-6xl font-black text-white uppercase tracking-tighter drop-shadow-xl mb-2 text-center">
+             Zlatan Rampage
+           </h2>
+           <p className="text-white/80 font-bold mb-8 text-center px-4">
+             Left Tap / Up = JUMP over Red Cards<br/>
+             Right Tap / Right Arrow = ATTACK Haaland
+           </p>
+           {gameState === 'gameover' && (
+             <div className="text-2xl font-bold text-yellow-400 mb-8 animate-bounce drop-shadow-md">
+               Final Score: {score}
+             </div>
+           )}
+           <button className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-black uppercase tracking-widest rounded-2xl shadow-xl transition-transform hover:scale-105 active:scale-95 text-xl">
+             {gameState === 'start' ? 'Play Now' : 'Play Again'}
+           </button>
         </div>
-      </div>
-      
+      )}
+
       {/* Zlatan Avatar */}
       <div 
-        className="absolute bottom-6 transition-all duration-300 z-10 text-6xl drop-shadow-2xl"
-        style={{ left: `calc(${zlatanX}% - 2rem)` }}
-      >
-        🧔🏻‍♂️
-      </div>
-
-      {/* Ball */}
-      <div 
-        className={`absolute text-4xl transition-all flex items-center justify-center ${ballState === 'kicked' ? 'duration-500 ease-out' : 'duration-300 ease-in-out'}`}
+        className="absolute z-10 text-6xl drop-shadow-xl flex items-center justify-center"
         style={{ 
-          left: `calc(${ballPos.x}% - 1rem)`, 
-          top: `${ballPos.y}%`,
-          transform: `scale(${ballPos.scale}) ${ballState === 'kicked' ? 'rotate(720deg)' : 'rotate(0deg)'}`
+          left: `20%`, 
+          bottom: `30%`,
+          transform: `translateY(-${zlatanY}px) ${isAttacking ? 'rotate(45deg) scale(1.2)' : ''}`,
+          transition: 'transform 300ms cubic-bezier(0.4, 0, 0.2, 1)'
         }}
       >
-        ⚽
+        {isAttacking ? '🦵' : '🧔🏻‍♂️'}
       </div>
 
-      {message && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-2xl md:text-4xl font-black text-pink-500 uppercase tracking-tighter drop-shadow-2xl text-center z-20 animate-bounce">
-          {message}
+      {/* Obstacles */}
+      {obstacles.map(obs => (
+        <div 
+          key={obs.id}
+          className={`absolute z-10 text-6xl drop-shadow-xl ${obs.defeated ? 'opacity-0 scale-150 rotate-180 duration-500' : ''}`}
+          style={{ 
+            left: `${obs.x}%`, 
+            bottom: obs.type === 'card' ? '30%' : '35%',
+            transition: obs.defeated ? 'all 500ms ease-out' : 'none'
+          }}
+        >
+          {obs.type === 'card' ? '🟥' : '👱🏼‍♂️'}
         </div>
-      )}
-
-      {ballState === 'idle' && !message && (
-        <div className="absolute bottom-32 text-slate-400 text-sm font-bold tracking-widest uppercase animate-pulse">
-          Tap to strike
-        </div>
-      )}
+      ))}
+      
+      {/* Custom CSS for ground slide animation */}
+      <style>{`
+        @keyframes slide {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
     </div>
   );
 };
-
 const BasketballGame = () => {
   const { user, updateUser } = useAppContext();
   const [score, setScore] = useState(0);
@@ -303,6 +432,14 @@ const BasketballGame = () => {
 
 export function SocialyzeGames({ onExit }: { onExit?: () => void }) {
   const [activeGame, setActiveGame] = useState<'menu' | 'soccer' | 'basketball' | 'cricket'>('menu');
+  
+  useEffect(() => {
+    const handleOpenArcade = (e: CustomEvent) => {
+      setActiveGame(e.detail);
+    };
+    window.addEventListener('OPEN_ARCADE', handleOpenArcade as EventListener);
+    return () => window.removeEventListener('OPEN_ARCADE', handleOpenArcade as EventListener);
+  }, []);
 
   if (activeGame === 'soccer') {
     return (
@@ -359,13 +496,13 @@ export function SocialyzeGames({ onExit }: { onExit?: () => void }) {
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-4">
+      <div className="p-4 flex flex-col gap-4 max-w-4xl mx-auto w-full">
         <div className="bg-gradient-to-br from-green-600 to-green-900 rounded-3xl p-6 cursor-pointer hover:scale-[1.02] transition-transform shadow-xl relative overflow-hidden" onClick={() => setActiveGame('soccer')}>
-          <div className="absolute -right-10 -bottom-10 opacity-20 text-[120px]">⚽</div>
-          <h2 className="text-2xl font-bold mb-2 relative z-10">Penalty Shootout</h2>
-          <p className="text-white/80 text-sm relative z-10">Test your reflexes against the keeper! Tap to shoot and score goals.</p>
+          <div className="absolute -right-10 -bottom-10 opacity-20 text-[120px]">🧔🏻‍♂️</div>
+          <h2 className="text-2xl font-bold mb-2 relative z-10">Zlatan Rampage</h2>
+          <p className="text-white/80 text-sm relative z-10">Play as Zlatan on the rampage! Jump over cards and defeat Haaland.</p>
           <div className="mt-4 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-bold inline-block relative z-10 hover:bg-white/30 transition-colors">
-            Play Soccer
+            Play Rampage
           </div>
         </div>
 

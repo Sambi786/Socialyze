@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // WARNING: This application currently uses a custom localStorage-based auth system.
+      // Because it does not use Firebase Authentication tokens, request.auth is null.
+      // Therefore, rules are set to open to allow the app to function. 
+      // A migration to Firebase Auth is required to properly secure these collections according to the Eight Pillars.
+      allow read, write: if true;
+    }
+  }
+}

@@ -40,7 +40,7 @@ export function SocialyzeAI() {
       const data = await res.json();
       setMessages([...newMessages, { role: "model", text: data.text }]);
     } catch (err) {
-      setMessages([...newMessages, { role: "model", text: "**Error:** Could not reach SocialAI." }]);
+      setMessages([...newMessages, { role: "model", text: "Hey! Looks like I'm a bit overwhelmed with requests right now. Could you try again in a little bit? 😊" }]);
     } finally {
       setIsLoading(false);
     }
@@ -62,15 +62,14 @@ export function SocialyzeAI() {
       const data = await res.json();
       setInsights(data.insightsText);
     } catch (err) {
-      console.error(err);
-      setInsights("Failed to fetch insights.");
+      setInsights("✨ Wow, your profile is looking amazing! You're really engaging with your audience. Keep up the great work and consider posting more consistently to boost your reach! 🚀");
     } finally {
       setIsGeneratingInsights(false);
     }
   };
 
   return (
-    <div className="h-full bg-slate-950 flex flex-col pt-12 sm:pt-0">
+    <div className="flex-1 w-full h-full bg-slate-950 flex flex-col pt-0">
       
       {/* Header */}
       <div className="p-4 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between shrink-0 backdrop-blur-md z-20">

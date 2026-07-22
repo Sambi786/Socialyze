@@ -9,6 +9,13 @@ export type User = {
   gender?: string;
   hasSeenWalkthrough?: boolean;
   achievements?: string[];
+  friends?: string[];
+  friendRequests?: string[];
+  isOnline?: boolean;
+  sambi?: number;
+  completedMissions?: string[];
+  socialLinks?: { youtube?: string; facebook?: string; snapchat?: string; discord?: string; };
+  preferences?: { notifications?: boolean; privateProfile?: boolean; };
 };
 
 export type Post = {
@@ -19,6 +26,39 @@ export type Post = {
   likes: number;
   comments: number;
   description: string;
+};
+
+export type Channel = {
+  id: string;
+  name: string;
+  type: 'text' | 'voice';
+  isPrivate?: boolean;
+  isReadOnly?: boolean;
+  allowedRoles?: string[];
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  channels: Channel[];
+  isPrivate?: boolean;
+};
+
+export type GroupChat = {
+  id: string;
+  name: string;
+  avatar: string;
+  adminId: string;
+  members: string[];
+  joinRequests?: string[];
+  description?: string;
+  theme?: string;
+  activeGame?: string;
+  rules?: string;
+  rulesEnabled?: boolean;
+  agreedUsers?: string[];
+  categories?: Category[];
+  hideMembers?: boolean;
 };
 
 export const MOCK_USER: User = {
@@ -107,3 +147,13 @@ export const MOCK_VIDEOS: Post[] = [
     description: "My coding setup tour 2026 💻"
   }
 ];
+
+export type Notification = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  icon?: string;
+  createdAt: number;
+  read: boolean;
+};

@@ -1,16 +1,21 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, Post, MOCK_USER, MOCK_FRIENDS, MOCK_REELS, MOCK_VIDEOS, MOCK_USER_POSTS } from "./data";
-import { toast } from "./lib/toast";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, Post, GroupChat, MOCK_REELS, MOCK_VIDEOS, MOCK_USER_POSTS } from './data';
+import { toast } from './lib/toast';
+import { db, auth } from './lib/firebase';
+import { collection, doc, setDoc, getDoc, getDocs, onSnapshot, query, updateDoc, arrayUnion, arrayRemove, serverTimestamp, orderBy, where, addDoc } from 'firebase/firestore';
+import { signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
-export interface GroupChat {
+export interface Story {
   id: string;
-  name: string;
-  avatar: string;
-  adminId: string;
-  members: string[];
+  userId: string;
+  type: 'image' | 'video';
+  url: string;
+  timestamp: number;
 }
 
 interface AppState {
+  firebaseUser: any;
+  profileSetupRequired: boolean;
   user: User | null;
   users: User[];
   reels: Post[];
@@ -19,406 +24,634 @@ interface AppState {
   friends: User[];
   groups: GroupChat[];
   messages: Record<string, any[]>;
+  typingStatus: Record<string, string[]>;
+  setTyping: (chatId: string, isTyping: boolean, isGroup?: boolean) => void;
+  activeChatId: string | null;
+  setActiveChatId: (id: string | null) => void;
+  stories: Story[];
+  notifications: any[];
+  sendGlobalNotification: (userId: string, title: string, message: string) => void;
+  markNotificationRead: (id: string) => void;
+  removeGroupMember: (groupId: string, memberId: string, reason: string) => void;
+  addGroupMember: (groupId: string, memberId: string) => void;
   accountsCount: number;
   hasSeenDemo: boolean;
-  login: (username: string, password: string, isRegister: boolean, email?: string, gender?: string) => { status: 'success' | 'new_user_tutorial' | 'old_account' | 'error', error?: string, pendingData?: any } | void;
-  completeTutorial: (pendingData: any) => void;
+  login: (username: string, password: string, isRegister: boolean, email?: string, gender?: string) => Promise<{ status: 'success' | 'new_user_tutorial' | 'old_account' | 'error', error?: string, pendingData?: any } | void>;
   logout: () => void;
   likePost: (postId: string, type: 'reel' | 'video' | 'post') => void;
   createPost: (post: Post) => void;
-  sendMessage: (chatId: string, text: string, isGroup?: boolean) => void;
+  sendMessage: (chatId: string, text: string, isGroup?: boolean, channelId?: string) => void;
   updateUser: (updatedData: Partial<User>) => void;
   addFriend: (userId: string) => void;
+  acceptFriendRequest: (userId: string) => void;
+  rejectFriendRequest: (userId: string) => void;
+  removeFriend: (userId: string) => void;
+  completeMission: (missionId: string, reward: number) => void;
   deleteAccount: () => void;
-  resetOldAccount: (username: string, email: string, newPassword: string) => boolean;
+  resetOldAccount: (username: string, email: string, newPassword: string) => Promise<boolean>;
+  completeTutorial: (pendingData: any) => void;
   createGroup: (name: string, memberIds: string[]) => void;
+  updateGroup: (groupId: string, data: Partial<GroupChat>) => void;
+  refreshReels: () => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  addStory: (url: string, type?: 'image' | 'video') => void;
+  searchUsers: (query: string) => User[];
+  incomingCall: any | null;
+  myActiveCall: any | null;
+  sessionTimeSeconds: number;
+  answerCall: (callId: string) => void;
+  endCall: (callId: string) => void;
+  startCall: (receiverId: string, isVideo?: boolean) => void;
+  searchGroups: (query: string) => GroupChat[];
+  requestJoinGroup: (groupId: string) => void;
+  approveJoinRequest: (groupId: string, userId: string) => void;
 }
 
 export const AppContext = createContext<AppState | null>(null);
 
+
+function getLevenshteinDistance(a: string, b: string): number {
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function fuzzyMatch(query: string, target: string): boolean {
+  if (!query || !target) return false;
+  const q = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const t = target.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!q) return false;
+  if (t.includes(q)) return true;
+  if (q.length > 3 && getLevenshteinDistance(q, t) <= 2) return true;
+  return false;
+}
+
 export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>([...MOCK_FRIENDS, MOCK_USER]); // all users
-  const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
-  const [groups, setGroups] = useState<GroupChat[]>([]);
+  const [firebaseUser, setFirebaseUser] = useState<any>(null);
+  const [profileSetupRequired, setProfileSetupRequired] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
   const [reels, setReels] = useState<Post[]>(MOCK_REELS);
   const [videos, setVideos] = useState<Post[]>(MOCK_VIDEOS);
   const [userPosts, setUserPosts] = useState<Post[]>(MOCK_USER_POSTS);
+  const [friends, setFriends] = useState<User[]>([]);
+  const [groups, setGroups] = useState<GroupChat[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [messages, setMessages] = useState<Record<string, any[]>>({});
-  
+  const [typingStatus, setTypingStatus] = useState<Record<string, string[]>>({});
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [accountsCount, setAccountsCount] = useState(0);
-  const [hasSeenDemo, setHasSeenDemo] = useState(false);
+  const [hasSeenDemo, setHasSeenDemo] = useState(true);
+  const [incomingCall, setIncomingCall] = useState<any | null>(null);
+  const [myActiveCall, setMyActiveCall] = useState<any | null>(null);
+  const [sessionTimeSeconds, setSessionTimeSeconds] = useState(0);
 
   useEffect(() => {
-    const saved = localStorage.getItem('socialyze-db');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setUser(parsed.user || null);
-        setUsers(parsed.users || [...MOCK_FRIENDS, MOCK_USER]);
-        setFriends(parsed.friends || MOCK_FRIENDS);
-        setGroups(parsed.groups || []);
-        setReels(parsed.reels || MOCK_REELS);
-        setVideos(parsed.videos || MOCK_VIDEOS);
-        setUserPosts(parsed.userPosts || MOCK_USER_POSTS);
-        setMessages(parsed.messages || {});
-        setAccountsCount(parsed.accountsCount || 0);
-        setHasSeenDemo(parsed.hasSeenDemo || false);
-      } catch (e) {}
+    if (!user) return;
+    const timer = setInterval(() => setSessionTimeSeconds(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const setOnline = async () => {
+      await updateDoc(doc(db, "users", user.id), { isOnline: true });
+    };
+    const setOffline = async () => {
+      await updateDoc(doc(db, "users", user.id), { isOnline: false });
+    };
+    setOnline();
+    window.addEventListener("beforeunload", setOffline);
+    return () => {
+      setOffline();
+      window.removeEventListener("beforeunload", setOffline);
+    };
+  }, [user?.id]);
+
+  // Firestore Subscriptions
+  useEffect(() => {
+    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+      const allUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+      setUsers(allUsers);
+      setAccountsCount(allUsers.length);
+      
+      // Save all user accounts to a local file via the backend API so the user can inspect it
+      fetch("/api/save-accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(allUsers)
+      }).catch(console.error);
+      
+      if (user) {
+        const me = allUsers.find(u => u.id === user.id);
+        if (me) {
+          setUser(me);
+          // Recompute friends if any data changed
+          const myFriends = allUsers.filter(u => {
+            const iHaveThem = me.friends?.includes(u.id);
+            const theyHaveMe = u.friends?.includes(me.id);
+            const areFriends = iHaveThem || theyHaveMe;
+            
+            if (areFriends) {
+              if (!iHaveThem) updateDoc(doc(db, "users", me.id), { friends: arrayUnion(u.id) }).catch(console.error);
+              if (!theyHaveMe) updateDoc(doc(db, "users", u.id), { friends: arrayUnion(me.id) }).catch(console.error);
+              
+              if (me.friendRequests?.includes(u.id)) {
+                updateDoc(doc(db, "users", me.id), { friendRequests: arrayRemove(u.id) }).catch(console.error);
+              }
+              if (u.friendRequests?.includes(me.id)) {
+                updateDoc(doc(db, "users", u.id), { friendRequests: arrayRemove(me.id) }).catch(console.error);
+              }
+              return true;
+            }
+            return false;
+          });
+          setFriends(myFriends);
+        }
+      }
+    });
+
+    const unsubGroups = onSnapshot(collection(db, "groups"), (snapshot) => {
+      const allGroups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GroupChat));
+      setGroups(allGroups);
+    });
+
+    const unsubCalls = onSnapshot(collection(db, "calls"), (snapshot) => {
+      const activeCalls = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      // Check if we are being called
+      const myIncoming = activeCalls.find(c => c.receiverId === user?.id && c.status === 'ringing');
+      if (myIncoming) {
+        setIncomingCall(myIncoming);
+      } else {
+        setIncomingCall(null);
+      }
+      
+      const myCall = activeCalls.find(c => (c.callerId === user?.id || c.receiverId === user?.id) && (c.status === 'ringing' || c.status === 'accepted'));
+      setMyActiveCall(myCall || null);
+    });
+
+    let unsubNotifs: any = null;
+    if (user) {
+      unsubNotifs = onSnapshot(query(collection(db, "notifications"), where("userId", "==", user.id), where("read", "==", false)), (snapshot) => {
+        const notifsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        setNotifications(notifsData);
+      });
     }
+      
+      const unsubStories = onSnapshot(query(collection(db, "stories"), orderBy("timestamp", "desc")), (snapshot) => {
+      const allStories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Story));
+      setStories(allStories);
+    });
+
+    return () => {
+      unsubNotifs && unsubNotifs();
+      unsubUsers();
+      unsubStories();
+      unsubGroups();
+      unsubCalls();
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsubMsgs = onSnapshot(query(collection(db, "messages"), where("participants", "array-contains", user.id)), (snapshot) => {
+      const msgsObj: Record<string, any[]> = {};
+      const typingObj: Record<string, string[]> = {};
+      snapshot.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.groupId) {
+          msgsObj[data.groupId] = data.messages || [];
+          typingObj[data.groupId] = data.typing || [];
+        } else {
+          const otherId = data.participants.find((p: string) => p !== user.id) || user.id;
+          msgsObj[otherId] = data.messages || [];
+          typingObj[otherId] = data.typing || [];
+        }
+      });
+      setMessages(msgsObj);
+      setTypingStatus(typingObj);
+    });
+    return () => unsubMsgs();
+  }, [user?.id]);
+
+  // Auth persistence using Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      setFirebaseUser(fUser);
+      if (fUser) {
+        // user is logged into firebase auth
+        const userDocRef = doc(db, 'users', fUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as User;
+          setUser(userData);
+          setProfileSetupRequired(false);
+          // Wait for allUsers to be populated to set friends, handled by unsubUsers listener
+        } else {
+          setUser(null);
+          setProfileSetupRequired(true);
+        }
+      } else {
+        setUser(null);
+        setProfileSetupRequired(false);
+      }
+    });
+    return () => unsubscribe();
   }, []);
 
-  const saveState = (newState: Partial<AppState>) => {
-    localStorage.setItem('socialyze-db', JSON.stringify({
-      user: newState.user !== undefined ? newState.user : user,
-      users: newState.users || users,
-      friends: newState.friends || friends,
-      groups: newState.groups || groups,
-      reels: newState.reels || reels,
-      videos: newState.videos || videos,
-      userPosts: newState.userPosts || userPosts,
-      messages: newState.messages || messages,
-      accountsCount: newState.accountsCount !== undefined ? newState.accountsCount : accountsCount,
-      hasSeenDemo: newState.hasSeenDemo !== undefined ? newState.hasSeenDemo : hasSeenDemo
-    }));
-  };
+  useEffect(() => {
+    if (user && users.length > 0) {
+      setFriends(users.filter(u => user.friends?.includes(u.id)));
+    }
+  }, [user, users.length]);
 
-  const login = (username: string, password: string, isRegister: boolean, email?: string, gender?: string) => {
-    let newUser: User = { id: `u_${Date.now()}`, username, password, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`, streaks: 0, email, gender };
-    
-    let nextAccountsCount = accountsCount;
-    let nextHasSeenDemo = hasSeenDemo;
-    let nextReels = [...reels];
-    let nextVideos = [...videos];
-    let nextUserPosts = [...userPosts];
-    let nextFriends = [...friends];
-    let nextUsers = [...users];
 
+  const login = async (username: string, password: string, isRegister: boolean, email?: string, gender?: string) => {
     if (isRegister) {
-      const existing = nextUsers.find(u => u.username === username);
+      const existing = users.find(u => u.username === username);
       if (existing) {
-        toast({ title: "Username taken", message: "That username is already in use.", icon: "bell" });
-        return { status: 'error' as const, error: 'username_taken' };
+        toast({ title: "Username taken", message: "Try another username.", icon: "bell" });
+        return { status: 'error' as const, error: 'exists' };
       }
-      nextAccountsCount += 1;
-      
-      toast({
-        title: "🚀 DEMO MODE ACTIVE",
-        message: "IMPORTANT: You are seeing the Demo version with pre-loaded examples. This happens ONLY ONCE to give you a tour of the app. Next time you login, it will be completely empty!",
-        icon: "gift"
-      });
-      nextHasSeenDemo = true;
-
-      // Restore demo data for new accounts
-      const missingDemoReels = MOCK_REELS.filter(mr => !nextReels.find(r => r.id === mr.id));
-      nextReels = [...nextReels, ...missingDemoReels];
-
-      const missingDemoVideos = MOCK_VIDEOS.filter(mv => !nextVideos.find(v => v.id === mv.id));
-      nextVideos = [...nextVideos, ...missingDemoVideos];
-
-      const missingDemoPosts = MOCK_USER_POSTS.filter(mp => !nextUserPosts.find(p => p.id === mp.id)).map(p => ({ ...p, author: newUser, id: p.id }));
-      nextUserPosts = [...missingDemoPosts, ...nextUserPosts];
-
-      const missingDemoFriends = MOCK_FRIENDS.filter(mf => !nextFriends.find(f => f.id === mf.id));
-      nextFriends = [...nextFriends, ...missingDemoFriends];
-      
-      const missingDemoUsers = MOCK_FRIENDS.filter(mf => !nextUsers.find(u => u.id === mf.id));
-      nextUsers = [...nextUsers, ...missingDemoUsers];
-      
-      if (nextAccountsCount % 10 === 0) {
-        toast({
-          title: "🎉 10th User! 🎉",
-          message: `AMAZING! You are the ${nextAccountsCount}th user to register!`,
-          icon: "gift"
-        });
-      } else {
-        toast({
-          title: "Welcome! 👋",
-          message: `So happy you joined us, ${username}!`,
-          icon: "bell"
-        });
-      }
-
-      // Auto Welcome Gesture post
-      const welcomePost: Post = {
-        id: `wp_${Date.now()}`,
-        author: newUser,
-        type: "reel",
-        url: "https://images.unsplash.com/photo-1516245834210-c4c142787335?auto=format&fit=crop&q=80&w=600&h=1000",
-        likes: 0,
-        comments: 0,
-        description: `Hey everyone! I just joined Socialyze 🎉 Say hi!`
+      const newUser: User = {
+        id: `u_${Date.now()}`,
+        username,
+        password,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`,
+        streaks: 0,
+        email,
+        gender,
+        friends: []
       };
-
-      nextReels = [welcomePost, ...nextReels];
-      nextUserPosts = [welcomePost, ...nextUserPosts];
-      nextUsers = [...nextUsers, newUser];
-      
-      return {
-        status: 'new_user_tutorial' as const,
-        pendingData: {
-          newUser, nextUsers, nextFriends, nextReels, nextVideos, nextUserPosts, nextAccountsCount, nextHasSeenDemo
-        }
-      };
+      await setDoc(doc(db, "users", newUser.id), newUser);
+      localStorage.setItem('socialyze_user_id', newUser.id);
+      return { status: 'new_user_tutorial' as const, pendingData: { newUser } };
     } else {
-      // login
-      if (nextHasSeenDemo) {
-        nextReels = nextReels.filter(r => !r.id.startsWith('r'));
-        nextVideos = nextVideos.filter(v => !v.id.startsWith('v'));
-        nextUserPosts = nextUserPosts.filter(p => !p.id.startsWith('p'));
-        nextFriends = nextFriends.filter(f => !f.id.startsWith('f'));
-      }
-
-      const existing = nextUsers.find(u => u.username === username);
+      const existing = users.find(u => u.username === username);
       if (existing) {
-        if (!existing.password) {
-          // Old account, needs password and email reset
-          return { status: 'old_account' as const };
-        }
         if (existing.password && existing.password !== password) {
           toast({ title: "Incorrect Password", message: "The password you entered is incorrect.", icon: "bell" });
           return { status: 'error' as const, error: 'incorrect_password' };
         }
-        newUser = existing;
-        toast({
-          title: "Welcome Back",
-          message: `Good to see you, ${username}!`,
-          icon: "bell"
-        });
+        setUser(existing);
+        setFriends(users.filter(u => existing.friends?.includes(u.id)));
+        localStorage.setItem('socialyze_user_id', existing.id);
+        toast({ title: "Welcome Back", message: `Good to see you, ${username}!`, icon: "bell" });
+        return { status: 'success' as const };
       } else {
-        toast({
-          title: "Account not found",
-          message: `We couldn't find ${username}. Please register.`,
-          icon: "bell"
-        });
+        toast({ title: "Account not found", message: `We couldn't find ${username}.`, icon: "bell" });
         return { status: 'error' as const, error: 'not_found' };
       }
     }
-
-    setUser(newUser);
-    setUsers(nextUsers);
-    setFriends(nextFriends);
-    setReels(nextReels);
-    setVideos(nextVideos);
-    setUserPosts(nextUserPosts);
-    setAccountsCount(nextAccountsCount);
-    setHasSeenDemo(nextHasSeenDemo);
-
-    saveState({
-      user: newUser,
-      users: nextUsers,
-      friends: nextFriends,
-      reels: nextReels,
-      videos: nextVideos,
-      userPosts: nextUserPosts,
-      accountsCount: nextAccountsCount,
-      hasSeenDemo: nextHasSeenDemo
-    });
-    return { status: 'success' as const };
   };
 
   const completeTutorial = (pendingData: any) => {
     setUser(pendingData.newUser);
-    setUsers(pendingData.nextUsers);
-    setFriends(pendingData.nextFriends);
-    setReels(pendingData.nextReels);
-    setVideos(pendingData.nextVideos);
-    setUserPosts(pendingData.nextUserPosts);
-    setAccountsCount(pendingData.nextAccountsCount);
-    setHasSeenDemo(pendingData.nextHasSeenDemo);
-
-    saveState({
-      user: pendingData.newUser,
-      users: pendingData.nextUsers,
-      friends: pendingData.nextFriends,
-      reels: pendingData.nextReels,
-      videos: pendingData.nextVideos,
-      userPosts: pendingData.nextUserPosts,
-      accountsCount: pendingData.nextAccountsCount,
-      hasSeenDemo: pendingData.nextHasSeenDemo
-    });
   };
 
-  const resetOldAccount = (username: string, email: string, newPassword: string) => {
-    const existingIndex = users.findIndex(u => u.username === username);
-    if (existingIndex === -1) return false;
-    const existing = users[existingIndex];
-    if (existing.email && existing.email.toLowerCase() !== email.toLowerCase()) {
-      return false;
-    }
+  const resetOldAccount = async (username: string, email: string, newPassword: string) => {
+    const existing = users.find(u => u.username === username);
+    if (!existing) return false;
+    if (existing.email && existing.email.toLowerCase() !== email.toLowerCase()) return false;
+    await updateDoc(doc(db, "users", existing.id), { password: newPassword, email: email.toLowerCase() });
     
-    // Reset password
-    const updatedUser = { ...existing, password: newPassword, email: email };
-    
-    // Only update the user, don't log them in yet, or do we? 
-    // Usually a password reset logs you in or confirms.
-    const nextUsers = [...users];
-    nextUsers[existingIndex] = updatedUser;
-    setUsers(nextUsers);
-    setUser(updatedUser);
-    saveState({
-      users: nextUsers,
-      user: updatedUser
-    });
+    // Also trigger save-accounts so it updates immediately in the local file
+    const updatedUsers = users.map(u => u.id === existing.id ? { ...u, password: newPassword, email: email.toLowerCase() } : u);
+    fetch("/api/save-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedUsers)
+    }).catch(console.error);
+
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await auth.signOut();
     setUser(null);
-    saveState({ user: null });
+    setProfileSetupRequired(false);
+    localStorage.removeItem('socialyze_user_id');
   };
 
-  const likePost = (postId: string, type: 'reel' | 'video' | 'post') => {
-    if (type === 'reel') {
-      const updated = reels.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p);
-      setReels(updated);
-      saveState({ reels: updated });
-    } else if (type === 'video') {
-      const updated = videos.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p);
-      setVideos(updated);
-      saveState({ videos: updated });
-    }
-    // Update userPosts if it exists there
-    if (userPosts.some(p => p.id === postId)) {
-      const updated = userPosts.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p);
-      setUserPosts(updated);
-      saveState({ userPosts: updated });
+  const likePost = () => {};
+  const createPost = () => {};
+
+  const setTyping = async (chatId: string, isTyping: boolean, isGroup?: boolean) => {
+    if (!user) return;
+    const docId = isGroup ? chatId : (user.id < chatId ? `${user.id}_${chatId}` : `${chatId}_${user.id}`);
+    const chatRef = doc(db, "messages", docId);
+    
+    try {
+      if (isTyping) {
+        const dataToSet: any = {
+          typing: arrayUnion(user.id),
+          groupId: isGroup ? chatId : null
+        };
+        if (!isGroup) {
+          dataToSet.participants = arrayUnion(user.id, chatId);
+        }
+        await setDoc(chatRef, dataToSet, { merge: true });
+      } else {
+        await setDoc(chatRef, { typing: arrayRemove(user.id) }, { merge: true });
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
-  const createPost = (post: Post) => {
-    if (post.type === 'reel') {
-      const updated = [post, ...reels];
-      setReels(updated);
-      saveState({ reels: updated });
+  const sendMessage = async (chatId: string, text: string, isGroup?: boolean, channelId?: string) => {
+    if (!user) return;
+    const msg: any = { sender: user.id, text, id: Date.now() };
+    if (channelId) msg.channelId = channelId;
+    
+    const docId = isGroup ? chatId : (user.id < chatId ? `${user.id}_${chatId}` : `${chatId}_${user.id}`);
+    const chatRef = doc(db, "messages", docId);
+    const chatDoc = await getDoc(chatRef);
+    
+    if (!chatDoc.exists()) {
+      let participants = [user.id, chatId];
+      if (isGroup) {
+        const group = groups.find(g => g.id === chatId);
+        participants = (group && group.members) ? group.members : [user.id];
+      }
+      
+      participants = participants.filter(Boolean); // Safe guard against undefined
+
+      await setDoc(chatRef, {
+        participants,
+        groupId: isGroup ? chatId : null,
+        messages: [msg]
+      });
     } else {
-      const updated = [post, ...videos];
-      setVideos(updated);
-      saveState({ videos: updated });
+      await updateDoc(chatRef, {
+        messages: arrayUnion(msg)
+      });
     }
-    const updatedUserPosts = [post, ...userPosts];
-    setUserPosts(updatedUserPosts);
-    saveState({ userPosts: updatedUserPosts });
   };
 
-  const sendMessage = (chatId: string, text: string, isGroup?: boolean) => {
-    const updatedMsgs = { ...messages };
-    if (!updatedMsgs[chatId]) updatedMsgs[chatId] = [];
-    updatedMsgs[chatId].push({ sender: 'me', text, id: Date.now() });
-    
-    // Auto-reply for individuals
-    if (!isGroup) {
-      setTimeout(() => {
-        setMessages(prev => {
-          const next = { ...prev };
-          if (!next[chatId]) next[chatId] = [];
-          next[chatId].push({ sender: 'them', text: `Got it! 😉`, id: Date.now() + 1 });
-          saveState({ messages: next });
-          return next;
-        });
-      }, 1500);
-    }
-
-    setMessages(updatedMsgs);
-    saveState({ messages: updatedMsgs });
-  };
-
-  const createGroup = (name: string, memberIds: string[]) => {
+  const completeMission = async (missionId: string, reward: number) => {
     if (!user) return;
-    const newGroup: GroupChat = {
-      id: `g_${Date.now()}`,
-      name,
-      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${name}`,
-      adminId: user.id,
-      members: [user.id, ...memberIds]
-    };
-    const nextGroups = [...groups, newGroup];
-    setGroups(nextGroups);
-    saveState({ groups: nextGroups });
-    toast({ title: "Group Created", message: `You created a new group: ${name}`, icon: "bell" });
-  };
-
-  const updateUser = (updatedData: Partial<User>) => {
-    if (!user) return;
-    const newUser = { ...user, ...updatedData };
-    setUser(newUser);
+    if (user.completedMissions?.includes(missionId)) return;
     
-    // Also update in users list so it persists correctly if needed
-    const nextUsers = users.map(u => u.id === user.id ? newUser : u);
-    setUsers(nextUsers);
-    
-    // Update posts authored by user
-    const updateAuthor = (post: Post) => post.author.id === user.id ? { ...post, author: newUser } : post;
-    const nextReels = reels.map(updateAuthor);
-    const nextVideos = videos.map(updateAuthor);
-    const nextUserPosts = userPosts.map(updateAuthor);
-    
-    setReels(nextReels);
-    setVideos(nextVideos);
-    setUserPosts(nextUserPosts);
-
-    saveState({ 
-      user: newUser, 
-      users: nextUsers,
-      reels: nextReels,
-      videos: nextVideos,
-      userPosts: nextUserPosts
+    const newSambi = (user.sambi || 0) + reward;
+    await updateDoc(doc(db, "users", user.id), {
+      sambi: newSambi,
+      completedMissions: arrayUnion(missionId)
     });
     
     toast({
-      title: "Profile Updated",
-      message: "Your profile has been saved successfully.",
-      icon: "bell"
+      title: "Mission Completed!",
+      message: `You earned ${reward} Sambi!`,
+      icon: "gift"
     });
   };
 
-  const addFriend = (userId: string) => {
-    const friendToAdd = users.find(u => u.id === userId);
-    if (!friendToAdd) return;
-    if (friends.some(f => f.id === userId)) {
-      toast({ title: "Already following", message: `You are already following ${friendToAdd.username}`, icon: "bell" });
-      return;
-    }
-    const nextFriends = [...friends, friendToAdd];
-    setFriends(nextFriends);
-    saveState({ friends: nextFriends });
-    toast({ title: "Started following", message: `You are now following ${friendToAdd.username}`, icon: "bell" });
-  };
-
-  const deleteAccount = () => {
+  const updateGroup = async (groupId: string, data: Partial<GroupChat>) => {
     if (!user) return;
-    
-    // Remove user's data
-    const nextUsers = users.filter(u => u.id !== user.id);
-    const nextReels = reels.filter(r => r.author.id !== user.id);
-    const nextVideos = videos.filter(v => v.author.id !== user.id);
-    const nextFriends = friends.filter(f => f.id !== user.id);
-    
-    setUser(null);
-    setUsers(nextUsers);
-    setReels(nextReels);
-    setVideos(nextVideos);
-    setUserPosts([]);
-    setFriends(nextFriends);
-    setMessages({});
-    
-    saveState({
-      user: null,
-      users: nextUsers,
-      reels: nextReels,
-      videos: nextVideos,
-      userPosts: [],
-      friends: nextFriends,
-      messages: {}
+    await updateDoc(doc(db, "groups", groupId), data);
+    toast({ title: "Group Updated", message: "Group settings saved.", icon: "bell" });
+  };
+
+  
+  const sendGlobalNotification = async (userId: string, title: string, message: string) => {
+    try {
+      await addDoc(collection(db, "notifications"), {
+        userId,
+        title,
+        message,
+        createdAt: Date.now(),
+        read: false
+      });
+    } catch (e) {
+      console.error("Failed to send notification", e);
+    }
+  };
+
+
+  const markNotificationRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", id), { read: true });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const removeGroupMember = async (groupId: string, memberId: string, reason: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "groups", groupId), {
+        members: arrayRemove(memberId)
+      });
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        await sendGlobalNotification(memberId, "Removed from group", `You were removed from ${group.name}. Reason: ${reason}`);
+      }
+      toast({ title: "Member removed", message: "Successfully removed member from group.", icon: "bell" });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const addGroupMember = async (groupId: string, memberId: string) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "groups", groupId), {
+        members: arrayUnion(memberId)
+      });
+      const group = groups.find(g => g.id === groupId);
+      if (group) {
+        await sendGlobalNotification(memberId, "Added to group", `You were added to ${group.name}.`);
+      }
+      toast({ title: "Member added", message: "Successfully added member to group.", icon: "bell" });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createGroup = async (name: string, memberIds: string[]) => {
+    if (!user) return;
+    const newGroup = {
+      id: `g_${Date.now()}`,
+      name,
+      avatar: `https://api.dicebear.com/7.x/shapes/svg?seed=${name}`,
+      adminId: user.id,
+      members: [user.id, ...memberIds].slice(0, 25),
+      joinRequests: [],
+      rulesEnabled: false,
+      rules: "Be respectful and kind.",
+      agreedUsers: [user.id],
+      hideMembers: false,
+      categories: [
+        {
+          id: "cat_general",
+          name: "General",
+          channels: [
+            { id: "chan_general", name: "general", type: "text" as const },
+            { id: "chan_announcements", name: "announcements", type: "text" as const, isReadOnly: true }
+          ]
+        },
+        {
+          id: "cat_voice",
+          name: "Voice Channels",
+          channels: [
+            { id: "chan_lounge", name: "Lounge", type: "voice" as const }
+          ]
+        }
+      ]
+    };
+    await setDoc(doc(db, "groups", newGroup.id), newGroup);
+    toast({ title: "Group Created", message: `${name} has been created.`, icon: "bell" });
+  };
+  const refreshReels = () => {};
+  
+  const updateUser = async (updatedData: Partial<User>) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, "users", user.id), updatedData);
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: "Error updating profile", message: e.message || "Failed to update profile", icon: "bell" });
+    }
+  };
+
+  const addFriend = async (userId: string) => {
+    if (!user) return;
+    // Instead of instantly adding to friends, we send a request to the other user
+    await updateDoc(doc(db, "users", userId), {
+      friendRequests: arrayUnion(user.id)
+    });
+    completeMission('send_friend_req', 20);
+    toast({ title: "Request Sent", message: `Friend request sent!`, icon: "bell" });
+  };
+
+  const acceptFriendRequest = async (userId: string) => {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.id), {
+      friends: arrayUnion(userId),
+      friendRequests: arrayRemove(userId)
+    });
+    await updateDoc(doc(db, "users", userId), {
+      friends: arrayUnion(user.id),
+      friendRequests: arrayRemove(user.id)
+    });
+    toast({ title: "Request Accepted", message: `You are now friends!`, icon: "bell" });
+  };
+
+  const rejectFriendRequest = async (userId: string) => {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.id), {
+      friendRequests: arrayRemove(userId)
+    });
+    toast({ title: "Request Rejected", message: `Friend request rejected.`, icon: "bell" });
+  };
+
+  const removeFriend = async (userId: string) => {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.id), {
+      friends: arrayRemove(userId)
+    });
+    await updateDoc(doc(db, "users", userId), {
+      friends: arrayRemove(user.id)
+    });
+    toast({ title: "Unfollowed", message: `You unfollowed them.`, icon: "bell" });
+  };
+
+  const deleteAccount = async () => {
+    if (!user) return;
+    logout();
+  };
+
+  const addStory = async (url: string, type: 'image' | 'video' = 'image') => {
+    if (!user) return;
+    const newStory = {
+      userId: user.id,
+      type,
+      url,
+      timestamp: Date.now()
+    };
+    await addDoc(collection(db, "stories"), newStory);
+    toast({ title: "Added to Story", message: "Your story is live for 24 hours!", icon: "bell" });
+  };
+
+  const searchUsers = (queryStr: string) => {
+    if (!queryStr) return [];
+    return users.filter(u => fuzzyMatch(queryStr, u.username) && u.id !== user?.id);
+  };
+
+  const startCall = async (receiverId: string, isVideo = false) => {
+    if (!user) return;
+    const newCall = {
+      callerId: user.id,
+      receiverId,
+      status: 'ringing',
+      type: isVideo ? 'video' : 'audio',
+      timestamp: Date.now()
+    };
+    await setDoc(doc(db, "calls", user.id), newCall); // using callerId as docId for simplicity
+  };
+
+  const answerCall = async (callId: string) => {
+    await updateDoc(doc(db, "calls", callId), { status: 'accepted' });
+  };
+
+  const endCall = async (callId: string) => {
+    await updateDoc(doc(db, "calls", callId), { status: 'ended' });
+  };
+
+  const searchGroups = (queryStr: string) => {
+    if (!queryStr) return [];
+    return groups.filter(g => fuzzyMatch(queryStr, g.name) && !g.members.includes(user?.id || ''));
+  };
+
+  const requestJoinGroup = async (groupId: string) => {
+    if (!user) return;
+    const groupRef = doc(db, "groups", groupId);
+    await updateDoc(groupRef, {
+      joinRequests: arrayUnion(user.id)
+    });
+    toast({ title: "Request Sent", message: "Wait for admin to approve.", icon: "bell" });
+  };
+
+  const approveJoinRequest = async (groupId: string, userId: string) => {
+    if (!user) return;
+    const groupRef = doc(db, "groups", groupId);
+    await updateDoc(groupRef, {
+      joinRequests: arrayRemove(userId),
+      members: arrayUnion(userId)
     });
     
-    toast({ title: "Account Deleted", message: "Your account has been permanently deleted.", icon: "bell" });
+    // update messages document participants if it exists
+    const msgRef = doc(db, "messages", groupId);
+    const msgDoc = await getDoc(msgRef);
+    if (msgDoc.exists()) {
+      await updateDoc(msgRef, {
+        participants: arrayUnion(userId)
+      });
+    }
   };
 
   return (
     <AppContext.Provider value={{
-      user, users, reels, videos, userPosts, friends, groups, messages, accountsCount, hasSeenDemo,
-      login, logout, likePost, createPost, sendMessage, updateUser, addFriend, deleteAccount, resetOldAccount, completeTutorial, createGroup
+      user, users, reels, videos, userPosts, friends, groups, messages, stories, accountsCount, hasSeenDemo,
+      login, logout, likePost, createPost, firebaseUser, profileSetupRequired, sendMessage, updateUser, addFriend, acceptFriendRequest, rejectFriendRequest, removeFriend, deleteAccount, resetOldAccount, completeTutorial, createGroup, updateGroup, refreshReels, addStory, searchUsers, searchGroups, requestJoinGroup, approveJoinRequest, incomingCall, myActiveCall, answerCall, endCall, startCall, typingStatus, setTyping, completeMission, activeChatId, setActiveChatId, searchQuery, setSearchQuery,
+      notifications, sendGlobalNotification, markNotificationRead, removeGroupMember, addGroupMember, sessionTimeSeconds
     }}>
       {children}
     </AppContext.Provider>

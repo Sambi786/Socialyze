@@ -2,15 +2,18 @@ import React, { useState, useEffect } from "react";
 import { Play, Radio, X, Send, Eye, MoreVertical, Share2, Heart, MessageCircle, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 import { PullToRefresh } from "./PullToRefresh";
 import { ShareModal } from "./ShareModal";
+import { CommentsModal } from "./CommentsModal";
 import { useAppContext } from "../AppContext";
 import { ReactionButton } from "./ReactionButton";
 import { toast } from "../lib/toast";
 import { Logo } from "./Logo";
 
 export function SocialyzeWatch() {
-  const { videos, user, likePost, addFriend, friends } = useAppContext();
+  const { videos, user, likePost, addFriend, removeFriend, friends } = useAppContext();
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [itemToShare, setItemToShare] = useState<{url: string, title: string} | null>(null);
+  const [commentsModalOpen, setCommentsModalOpen] = useState(false);
+  const [activePostIdForComments, setActivePostIdForComments] = useState<string | null>(null);
   const [isLive, setIsLive] = useState(false);
   const [liveComments, setLiveComments] = useState<{id: number, user: string, text: string}[]>([
     { id: 1, user: "alex_snap", text: "Yoo this stream is lit 🔥" },
@@ -198,7 +201,13 @@ export function SocialyzeWatch() {
               iconClassName="w-6 h-6"
               textClassName="text-xs mt-1"
             />
-            <div className="flex flex-col items-center group cursor-pointer text-slate-400 hover:text-white">
+            <div 
+              className="flex flex-col items-center group cursor-pointer text-slate-400 hover:text-white"
+              onClick={() => {
+                setActivePostIdForComments(activeVideo.id);
+                setCommentsModalOpen(true);
+              }}
+            >
               <MessageCircle className="w-6 h-6 mb-1" />
               <span className="text-xs font-bold font-mono">124</span>
             </div>
@@ -214,7 +223,7 @@ export function SocialyzeWatch() {
 
   if (isLive && user) {
     return (
-      <div className="h-full bg-slate-950 flex flex-col relative overflow-hidden text-white">
+      <div className="flex-1 w-full h-full bg-slate-950 flex flex-col relative overflow-hidden text-white">
         {/* Background Mock Video */}
         <div 
           className="absolute inset-0 bg-cover bg-center blur-sm scale-110"
@@ -260,7 +269,7 @@ export function SocialyzeWatch() {
         </div>
 
         {/* Bottom Overlay containing Comments and Input */}
-        <div className="relative z-10 w-full p-4 flex flex-col justify-end pointer-events-auto h-80 max-h-[50vh]">
+        <div className="relative z-10 w-full p-4 flex flex-col justify-end pointer-events-auto h-80 max-h-[50dvh]">
           {/* Comments List */}
           <div className="flex-1 overflow-y-auto hide-scrollbar flex flex-col justify-end gap-3 mb-4 mask-image-b min-h-0">
             {liveComments.map(c => (
@@ -298,7 +307,7 @@ export function SocialyzeWatch() {
   }
 
   return (
-    <div className="h-full bg-slate-950 flex flex-col overflow-hidden">
+    <div className="flex-1 w-full h-full bg-slate-950 flex flex-col overflow-hidden">
       <div className="p-4 border-b border-slate-800 sticky top-0 bg-slate-900/50 backdrop-blur-md z-20 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Logo size="sm" />
@@ -327,6 +336,8 @@ export function SocialyzeWatch() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {videos.map((video) => {
             const isFollowing = friends.some(f => f.id === video.author.id) || video.author.id === user?.id;
+            const hasRequested = video.author.friendRequests?.includes(user?.id || '');
+            const hasRequestedMe = user?.friendRequests?.includes(video.author.id);
             return (
             <div key={video.id} className="group cursor-pointer flex flex-col" onClick={() => setActiveVideo(video)}>
               <div className="relative w-full aspect-video rounded-3xl overflow-hidden bg-slate-800 mb-3 border border-transparent group-hover:border-slate-700 transition-colors relative">
@@ -369,7 +380,23 @@ export function SocialyzeWatch() {
                 <h3 className="text-white font-bold text-sm line-clamp-2 leading-tight">{video.description}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-slate-400 text-xs font-medium">{video.author.username}</span>
-                  {!isFollowing && (
+                  {isFollowing ? (
+                    video.author.id !== user?.id && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); removeFriend(video.author.id); }}
+                        className="text-slate-500 hover:text-slate-400 text-[10px] font-bold uppercase transition-colors"
+                      >
+                        Following
+                      </button>
+                    )
+                  ) : hasRequested ? (
+                    <button 
+                      className="text-slate-500 text-[10px] font-bold uppercase"
+                      disabled
+                    >
+                      Requested
+                    </button>
+                  ) : (
                     <button 
                       onClick={(e) => { e.stopPropagation(); addFriend(video.author.id); }}
                       className="text-pink-500 hover:text-pink-400 text-[10px] font-bold uppercase transition-colors"
@@ -381,10 +408,7 @@ export function SocialyzeWatch() {
                 <span className="text-slate-500 text-xs">{video.type === "live" ? "Started 10m ago" : "2 days ago • 12K views"}</span>
               </div>
               <div className="pt-1 px-1 flex flex-col gap-2 items-center">
-                <MoreVertical 
-                  className="w-5 h-5 text-slate-500 mb-2 cursor-pointer hover:text-white transition-colors" 
-                  onClick={(e) => { e.stopPropagation(); toast({ title: "More Options", message: "Video options coming soon.", icon: "bell" }) }}
-                />
+                
                 <ReactionButton
                   postId={video.id}
                   type="video"
@@ -407,6 +431,14 @@ export function SocialyzeWatch() {
         url={itemToShare?.url}
         title={itemToShare?.title}
       />
+
+      {activePostIdForComments && (
+        <CommentsModal 
+          isOpen={commentsModalOpen}
+          onClose={() => setCommentsModalOpen(false)}
+          postId={activePostIdForComments}
+        />
+      )}
     </div>
   );
 }
