@@ -42,3 +42,8 @@ There is massive room for improvement! We encourage people to fork, remix, and p
    ```
 
 Let's build the ultimate unified social media experience together! Feel free to fork and start creating.
+
+## 🤖 Credits
+
+This application is developed by **SAMBI (Smart Assistant Made By (SMNB) Intelligence)**.
+

@@ -354,6 +354,12 @@ export function SocialyzeProfile({ profileId, onLogout, onNavigateToPost }: { pr
           <AlertTriangle className="w-5 h-5" />
           Delete Account
         </button>
+
+        <div className="mt-8 pt-6 border-t border-slate-800/50 flex flex-col items-center justify-center gap-1 opacity-70">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Developed by</p>
+          <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-500 tracking-wider">SAMBI</span>
+          <p className="text-[10px] text-slate-500 text-center font-medium">Smart Assistant Made By (SMNB) Intelligence</p>
+        </div>
       </div>
       )}
 
